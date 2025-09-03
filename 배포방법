@@ -1,0 +1,184 @@
+GitHub 푸시 및 Vercel 배포 가이드
+
+  📋 1단계: 깃허브 푸시 준비
+
+  1.1 환경변수 파일 확인
+
+  # .env.local 파일이 .gitignore에 포함되어 있는지 확인
+  cat .gitignore | grep .env.local
+
+  1.2 Git 상태 확인 및 커밋
+
+  cd /Users/moon/Desktop/miraclass
+
+  # 현재 상태 확인
+  git status
+
+  # 모든 파일 추가
+  git add .
+
+  # 커밋 생성
+  git commit -m "feat: Vercel 배포용 Next.js 14 App Router 
+  마이그레이션 완료
+
+  - Docker 기반 마이크로서비스에서 Vercel 서버리스로 전환
+  - Pages Router → App Router 마이그레이션
+  - Supabase PostgreSQL 연동 설정
+  - JWT 기반 인증 시스템 구현
+  - 완전한 회원가입/로그인/대시보드 플로우
+  - Ant Design UI 컴포넌트 적용
+  - TypeScript 타입 안전성 확보"
+
+  # 원격 저장소에 푸시
+  git push origin main
+
+  🚀 2단계: Vercel 배포
+
+  2.1 Vercel 프로젝트 생성
+
+  1. Vercel 대시보드 접속 (https://vercel.com)
+  2. "New Project" 클릭
+  3. GitHub 저장소 선택 (miraclass)
+  4. Import 클릭
+
+  2.2 프로젝트 설정
+
+  - Project Name: miraclass (또는 원하는 이름)
+  - Framework Preset: Next.js (자동 감지됨)
+  - Root Directory: ./ (기본값)
+  - Build Command: npm run build (자동 설정됨)
+  - Output Directory: .next (자동 설정됨)
+
+  ⚙️ 3단계: 환경변수 설정 (매우 중요!)
+
+  3.1 Vercel 대시보드에서 환경변수 추가
+
+  Project Settings → Environment Variables에서 다음 변수들을
+  추가:
+
+  # Supabase Configuration
+  NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+  SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+
+  # Database
+  DATABASE_URL=postgresql://postgres:[password]@db.[project-r
+  ef].supabase.co:5432/postgres
+
+  # JWT
+  JWT_SECRET=miraclass-super-secure-jwt-secret-2025-productio
+  n
+  JWT_EXPIRES_IN=7d
+
+  # App URL
+  NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
+
+  # Node Environment
+  NODE_ENV=production
+
+  3.2 Supabase 실제 값 설정
+
+  1. Supabase 프로젝트 생성 (https://supabase.com)
+  2. Project Settings → API 에서 값 복사:
+    - URL → NEXT_PUBLIC_SUPABASE_URL
+    - anon public → NEXT_PUBLIC_SUPABASE_ANON_KEY
+    - service_role → SUPABASE_SERVICE_ROLE_KEY
+  3. Database → Settings 에서 CONNECTION STRING 복사 →
+  DATABASE_URL
+
+  🗄️ 4단계: 데이터베이스 스키마 설정
+
+  4.1 Supabase SQL Editor에서 테이블 생성
+
+  -- Schools 테이블
+  CREATE TABLE schools (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      address TEXT,
+      phone VARCHAR(50),
+      email VARCHAR(255),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  );
+
+  -- Users 테이블
+  CREATE TABLE users (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      name VARCHAR(100) NOT NULL,
+      role VARCHAR(20) NOT NULL CHECK (role IN ('student',
+  'teacher', 'admin')),
+      school_id UUID REFERENCES schools(id),
+      grade INTEGER,
+      class_number INTEGER,
+      profile_image_url TEXT,
+      is_active BOOLEAN DEFAULT TRUE,
+      last_login TIMESTAMP WITH TIME ZONE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  );
+
+  -- 인덱스 생성
+  CREATE INDEX idx_users_email ON users(email);
+  CREATE INDEX idx_users_school_id ON users(school_id);
+  CREATE INDEX idx_users_role ON users(role);
+
+  -- RLS (Row Level Security) 활성화
+  ALTER TABLE schools ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+  -- 정책 생성 (기본적인 보안 정책)
+  CREATE POLICY "Users can view their own data" ON users
+      FOR SELECT USING (auth.uid()::text = id::text);
+
+  ✅ 5단계: 배포 확인 및 테스트
+
+  5.1 배포 상태 확인
+
+  1. Vercel 대시보드에서 Deployments 탭 확인
+  2. 빌드 로그 확인 - 에러가 없는지 점검
+  3. Visit 버튼으로 배포된 사이트 접속
+
+  5.2 기능 테스트
+
+  # 배포된 사이트에서 테스트할 항목들:
+  ✅ 홈페이지 로딩
+  ✅ 회원가입 폼 작동
+  ✅ 로그인 폼 작동
+  ✅ 대시보드 접근
+  ✅ 인증 플로우 전체
+
+  🔧 6단계: 문제 해결 가이드
+
+  6.1 빌드 에러 발생시
+
+  # Vercel 로그에서 확인할 포인트:
+  - TypeScript 에러
+  - 누락된 환경변수
+  - 의존성 설치 실패
+  - Supabase 연결 실패
+
+  6.2 자주 발생하는 문제들
+
+  1. 환경변수 누락 → Vercel 대시보드에서 재확인
+  2. Supabase 연결 실패 → URL/키 값 정확성 확인
+  3. JWT_SECRET 설정 누락 → 강력한 랜덤 문자열로 설정
+  4. DATABASE_URL 형식 오류 → Supabase 연결 문자열 정확히
+  복사
+
+  📝 추가 권장사항
+
+  도메인 설정 (선택사항)
+
+  1. Vercel 대시보드 → Domains 탭
+  2. 커스텀 도메인 추가 및 DNS 설정
+
+  SSL 인증서
+
+  - Vercel에서 자동으로 Let's Encrypt SSL 인증서 제공
+  - HTTPS 자동 리다이렉트 설정됨
+
+  이제 모든 준비가 완료되었습니다! 위 단계를 따라 진행하시면
+  성공적으로 배포할 수 있을 것입니다. 혹시 문제가 발생하면
+  에러 메시지를 알려주세요.

@@ -1,0 +1,74 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  
+  "functions": {
+    "app/api/**/*.js": {
+      "maxDuration": 30
+    },
+    "app/api/ai/**/*.js": {
+      "maxDuration": 60,
+      "memory": 512
+    }
+  },
+  
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "JWT_SECRET": "@jwt_secret",
+    "DATABASE_URL": "@database_url"
+  },
+  
+  "regions": ["icn1"],
+  
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ],
+  
+  "rewrites": [
+    {
+      "source": "/api/auth/(.*)",
+      "destination": "/api/auth/$1"
+    },
+    {
+      "source": "/api/classes/(.*)",
+      "destination": "/api/classes/$1"
+    },
+    {
+      "source": "/api/users/(.*)",
+      "destination": "/api/users/$1"
+    }
+  ],
+  
+  "redirects": [
+    {
+      "source": "/admin",
+      "destination": "/dashboard?role=admin",
+      "permanent": false
+    },
+    {
+      "source": "/teacher",
+      "destination": "/dashboard?role=teacher", 
+      "permanent": false
+    }
+  ]
+}

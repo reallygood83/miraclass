@@ -1,0 +1,52 @@
+# Docker 관련 파일들 (백업본 유지)
+docker-backup/
+docker-compose*.yml
+Dockerfile*
+scripts/
+monitoring/
+
+# 데이터베이스 관련
+database/
+backups/
+
+# 개발용 파일들
+*.log
+logs/
+tmp/
+.tmp/
+
+# 테스트 관련
+test/
+tests/
+cypress/
+playwright/
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# IDE 관련
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS 관련
+.DS_Store
+Thumbs.db
+
+# 환경 파일들 (보안상 제외)
+.env.local
+.env.*.local
+.env.test
+.env.production
+
+# 대용량 파일들
+uploads/
+files/
+storage/
+
+# 기타
+docs/DEPLOYMENT.md
+README.docker.md

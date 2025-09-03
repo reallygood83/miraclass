@@ -1,0 +1,76 @@
+{
+  "name": "miraclass",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Educational Social Network Platform - Vercel Deployment",
+  "keywords": ["education", "social-network", "students", "nextjs", "supabase"],
+  "author": "MiraClass Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "vercel-build": "npm run build",
+    "postbuild": "echo 'Build completed for Vercel deployment'",
+    "db:migrate": "echo 'Database migration script would run here'",
+    "db:seed": "echo 'Database seeding script would run here'",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:e2e": "playwright test tests/e2e",
+    "test:performance": "./tests/performance/run-performance-tests.sh",
+    "test:performance:load": "./tests/performance/run-performance-tests.sh -t load",
+    "test:performance:stress": "./tests/performance/run-performance-tests.sh -t stress",
+    "test:performance:all": "./tests/performance/run-performance-tests.sh -t all -d 60 -c 25",
+    "clean": "rm -rf .next out",
+    "analyze": "ANALYZE=true npm run build"
+  },
+  "dependencies": {
+    "next": "14.0.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "@ant-design/icons": "^5.2.6",
+    "antd": "^5.12.1",
+    "@supabase/supabase-js": "^2.38.4",
+    "jose": "^5.2.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "axios": "^1.6.2",
+    "d3": "^7.8.5",
+    "recharts": "^2.8.0",
+    "date-fns": "^2.30.0",
+    "@vercel/analytics": "^1.1.1",
+    "swr": "^2.2.4",
+    "framer-motion": "^10.16.16"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.0.0",
+    "typescript": "^5",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+  }
+}
