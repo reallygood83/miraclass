@@ -30,8 +30,8 @@ import {
   BellOutlined,
   UserOutlined,
   TeamOutlined,
-  TrendingUpOutlined,
-  TrendingDownOutlined,
+  RiseOutlined,
+  FallOutlined,
   AlertOutlined,
   CheckCircleOutlined,
   InfoCircleOutlined,
@@ -72,7 +72,7 @@ interface StudentMonitoring {
 
 export default function MonitoringPage() {
   const [selectedClass, setSelectedClass] = useState('6학년 1반');
-  const [dateRange, setDateRange] = useState<any[]>([
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([
     dayjs().subtract(7, 'day'),
     dayjs()
   ]);
@@ -212,8 +212,8 @@ export default function MonitoringPage() {
 
   const getTrendIcon = (change: string) => {
     const trendMap = {
-      up: <TrendingUpOutlined style={{ color: '#52c41a' }} />,
-      down: <TrendingDownOutlined style={{ color: '#fa541c' }} />,
+      up: <RiseOutlined style={{ color: '#52c41a' }} />,
+      down: <FallOutlined style={{ color: '#fa541c' }} />,
       stable: <UserOutlined style={{ color: '#1890ff' }} />
     };
     
@@ -265,7 +265,7 @@ export default function MonitoringPage() {
             
             <RangePicker
               value={dateRange}
-              onChange={setDateRange}
+              onChange={(dates) => setDateRange(dates || [null, null])}
               format="YYYY-MM-DD"
               size="large"
             />
@@ -390,8 +390,7 @@ export default function MonitoringPage() {
                             <Text strong>{alert.studentName}</Text>
                             <Tag 
                               color={getAlertColor(alert.severity)}
-                              size="small"
-                            >
+                                                          >
                               {alert.severity}
                             </Tag>
                             {!alert.isRead && (
