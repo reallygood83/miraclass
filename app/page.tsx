@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, Typography, Row, Col, Space } from 'antd';
-import { LoginOutlined, UserAddOutlined, BookOutlined, MessageOutlined, TeamOutlined } from '@ant-design/icons';
+import { LoginOutlined, UserAddOutlined, UserOutlined, MessageOutlined, TeamOutlined } from '@ant-design/icons';
 import { authUtils } from '@/lib/utils/auth';
 
 const { Title, Paragraph } = Typography;
@@ -58,7 +58,7 @@ export default function HomePage() {
           alignItems: 'center'
         }}>
           <Title level={2} style={{ color: 'white', margin: 0 }}>
-            MiraClass
+            우리반 커넥트
           </Title>
           {!isLoggedIn && (
             <Space>
@@ -99,7 +99,7 @@ export default function HomePage() {
               textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
             }}
           >
-            교육용 소셜 네트워크 플랫폼
+            AI 기반 학급 관계 분석 플랫폼
           </Title>
           <Paragraph 
             style={{ 
@@ -110,8 +110,8 @@ export default function HomePage() {
               margin: '0 auto 40px'
             }}
           >
-            학생과 교사가 함께 학습하고 소통할 수 있는 혁신적인 교육 환경을 제공합니다.
-            실시간 소통, 과제 관리, 학습 활동을 하나의 플랫폼에서 경험해보세요.
+            AI 기술을 활용하여 우리 반 학생들의 관계를 시각화하고 분석합니다.
+            친구 관계 네트워크를 통해 소외되는 학생이 없는 따뜻한 교실을 만들어가세요.
           </Paragraph>
           
           {!isLoggedIn && (
@@ -160,17 +160,42 @@ export default function HomePage() {
               }}
             >
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <BookOutlined 
+                <TeamOutlined 
                   style={{ 
                     fontSize: '48px', 
                     color: '#1890ff', 
                     marginBottom: '16px' 
                   }} 
                 />
-                <Title level={3}>클래스 관리</Title>
+                <Title level={3}>관계 네트워크 시각화</Title>
                 <Paragraph>
-                  교사는 쉽게 클래스를 생성하고 관리할 수 있으며,
-                  학생들은 간단하게 클래스에 참여할 수 있습니다.
+                  학생들의 친구 관계를 시각적 네트워크로 표현하여
+                  소외 위험군 학생과 인기 학생을 한눈에 파악할 수 있습니다.
+                </Paragraph>
+              </div>
+            </Card>
+          </Col>
+          
+          <Col xs={24} md={8}>
+            <Card 
+              style={{ 
+                height: '100%',
+                background: 'rgba(255, 255, 255, 0.9)',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <UserOutlined 
+                  style={{ 
+                    fontSize: '48px', 
+                    color: '#52c41a', 
+                    marginBottom: '16px' 
+                  }} 
+                />
+                <Title level={3}>AI 관계 분석</Title>
+                <Paragraph>
+                  인공지능이 친구 설문 결과를 분석하여
+                  학생들의 관계 패턴과 사회성 발달 상태를 제공합니다.
                 </Paragraph>
               </div>
             </Card>
@@ -188,39 +213,14 @@ export default function HomePage() {
                 <MessageOutlined 
                   style={{ 
                     fontSize: '48px', 
-                    color: '#52c41a', 
-                    marginBottom: '16px' 
-                  }} 
-                />
-                <Title level={3}>실시간 소통</Title>
-                <Paragraph>
-                  게시글, 댓글, 실시간 채팅을 통해
-                  학생과 교사 간 원활한 소통을 지원합니다.
-                </Paragraph>
-              </div>
-            </Card>
-          </Col>
-          
-          <Col xs={24} md={8}>
-            <Card 
-              style={{ 
-                height: '100%',
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(10px)'
-              }}
-            >
-              <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <TeamOutlined 
-                  style={{ 
-                    fontSize: '48px', 
                     color: '#fa8c16', 
                     marginBottom: '16px' 
                   }} 
                 />
-                <Title level={3}>협업 학습</Title>
+                <Title level={3}>맞춤 상담 지원</Title>
                 <Paragraph>
-                  그룹 프로젝트, 토론, 협업 활동을 통해
-                  더욱 효과적인 학습 경험을 제공합니다.
+                  분석 결과를 바탕으로 각 학생에게 필요한
+                  개별 상담과 관계 개선 방안을 제시합니다.
                 </Paragraph>
               </div>
             </Card>
@@ -241,7 +241,7 @@ export default function HomePage() {
           textAlign: 'center'
         }}>
           <Paragraph style={{ color: 'rgba(255, 255, 255, 0.7)', margin: 0 }}>
-            © 2024 MiraClass. 모든 권리 보유.
+            © 2024 우리반 커넥트. 모든 권리 보유.
           </Paragraph>
         </div>
       </div>
