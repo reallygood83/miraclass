@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Card, 
   Typography, 
@@ -27,7 +28,7 @@ import {
 } from '@ant-design/icons';
 import Layout from '@/components/common/Layout';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Paragraph } = Typography;
 const { Option } = Select;
 
 interface ApiSettings {
@@ -38,9 +39,23 @@ interface ApiSettings {
   maxQuestionsPerSurvey: number;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'teacher' | 'student';
+  school_id?: string;
+  grade?: number;
+  class_number?: number;
+}
+
 export default function SettingsPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const router = useRouter();
   const [settings, setSettings] = useState<ApiSettings>({
     geminiApiKey: '',
     openaiApiKey: '',
@@ -48,6 +63,37 @@ export default function SettingsPage() {
     autoQuestionGeneration: true,
     maxQuestionsPerSurvey: 5
   });
+
+  // 클라이언트 사이드임을 확인
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) {
+      console.log('⏳ Waiting for client-side hydration...');
+      return;
+    }
+
+    if (authChecked) {
+      console.log('🔒 Authentication already checked');
+      return;
+    }
+
+    console.log('⚙️ Settings component mounted (client-side)');
+    
+    // 테스트를 위한 더미 사용자 설정 (dashboard와 동일)
+    const dummyUser: User = {
+      id: '1',
+      name: '김선생',
+      email: 'teacher@test.com',
+      role: 'teacher'
+    };
+
+    console.log('🧪 Using dummy user for settings:', dummyUser.name);
+    setUser(dummyUser);
+    setAuthChecked(true);
+  }, [isClient, authChecked, router]);
 
   // Load settings from localStorage on component mount
   useEffect(() => {
@@ -265,8 +311,50 @@ export default function SettingsPage() {
     }
   ];
 
+  // 서버사이드 렌더링 중이거나 인증 체크 중
+  if (!isClient || !authChecked) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ 
+          background: 'white', 
+          padding: '40px', 
+          borderRadius: '12px', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '18px', color: '#666', marginBottom: '16px' }}>
+            {!isClient ? '🔄 시스템 초기화 중...' : 
+             !authChecked ? '🔐 인증 확인 중...' : 
+             '⚙️ 설정 로딩 중...'}
+          </div>
+          {!isClient && (
+            <div style={{ fontSize: '14px', color: '#999' }}>
+              클라이언트 환경을 준비하고 있습니다
+            </div>
+          )}
+          {isClient && !authChecked && (
+            <div style={{ fontSize: '14px', color: '#999' }}>
+              로그인 상태를 확인하고 있습니다
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 사용자 정보가 없으면 null 반환 (인증 실패시 리다이렉트됨)
+  if (!user) {
+    return null;
+  }
+
   return (
-    <Layout user={{ name: '관리자', role: '교사' }}>
+    <Layout user={{ name: user.name, role: user.role }}>
       <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>

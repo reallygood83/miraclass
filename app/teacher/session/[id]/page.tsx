@@ -70,7 +70,7 @@ interface SurveyResponse {
 export default function SessionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const sessionId = params.sessionId as string;
+  const sessionId = params.id as string;
   
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [responses, setResponses] = useState<SurveyResponse[]>([]);

@@ -270,7 +270,7 @@ export default function SurveysPage() {
   const totalResponses = surveys.reduce((sum, s) => sum + s.responses, 0);
 
   return (
-    <Layout user={{ name: '관리자', role: '교사' }}>
+    <Layout user={{ name: '김선생', role: '교사' }}>
       <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

@@ -68,7 +68,7 @@ export default function DashboardPage() {
     // 테스트를 위한 더미 사용자 설정
     const dummyUser: User = {
       id: '1',
-      name: '김선생님',
+      name: '김선생',
       email: 'teacher@test.com',
       role: 'teacher'
     };
