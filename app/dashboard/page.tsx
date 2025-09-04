@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { authUtils } from '@/lib/utils/auth';
 import RelationshipNetwork from '@/components/network/RelationshipNetwork';
+import Layout from '@/components/common/Layout';
 
 const { Title, Paragraph } = Typography;
 
@@ -189,7 +190,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+    <Layout user={{ name: user.name, role: user.role }}>
+      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* 환영 메시지 */}
       <div style={{ marginBottom: '32px' }}>
         <Title level={2}>
@@ -343,6 +345,7 @@ export default function DashboardPage() {
           </Card>
         </Col>
       </Row>
-    </div>
+      </div>
+    </Layout>
   );
 }

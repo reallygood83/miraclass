@@ -27,6 +27,7 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
+import Layout from '@/components/common/Layout';
 
 const { Title, Text } = Typography;
 
@@ -269,85 +270,87 @@ export default function SurveysPage() {
   const totalResponses = surveys.reduce((sum, s) => sum + s.responses, 0);
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <Title level={2}>설문 관리</Title>
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />}
-            size="large"
-            onClick={() => router.push('/survey/create')}
-          >
-            새 설문 만들기
-          </Button>
+    <Layout user={{ name: '관리자', role: '교사' }}>
+      <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <Title level={2}>설문 관리</Title>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />}
+              size="large"
+              onClick={() => router.push('/survey/create')}
+            >
+              새 설문 만들기
+            </Button>
+          </div>
+          
+          <Text type="secondary">
+            학생 관계 분석을 위한 설문을 생성하고 관리합니다.
+          </Text>
         </div>
-        
-        <Text type="secondary">
-          학생 관계 분석을 위한 설문을 생성하고 관리합니다.
-        </Text>
+
+        {/* 통계 카드 */}
+        <Row gutter={16} style={{ marginBottom: '24px' }}>
+          <Col span={6}>
+            <Card>
+              <Statistic
+                title="전체 설문"
+                value={totalSurveys}
+                prefix={<UserOutlined />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card>
+              <Statistic
+                title="진행 중"
+                value={activeSurveys}
+                prefix={<ClockCircleOutlined />}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card>
+              <Statistic
+                title="완료됨"
+                value={completedSurveys}
+                prefix={<CheckCircleOutlined />}
+                valueStyle={{ color: '#722ed1' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card>
+              <Statistic
+                title="총 응답"
+                value={totalResponses}
+                prefix={<BarChartOutlined />}
+                valueStyle={{ color: '#fa8c16' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 설문 목록 테이블 */}
+        <Card>
+          <Table
+            columns={columns}
+            dataSource={surveys}
+            loading={loading}
+            rowKey="id"
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) => 
+                `${range[0]}-${range[1]} of ${total} 설문`
+            }}
+          />
+        </Card>
       </div>
-
-      {/* 통계 카드 */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="전체 설문"
-              value={totalSurveys}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="진행 중"
-              value={activeSurveys}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="완료됨"
-              value={completedSurveys}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#722ed1' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="총 응답"
-              value={totalResponses}
-              prefix={<BarChartOutlined />}
-              valueStyle={{ color: '#fa8c16' }}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 설문 목록 테이블 */}
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={surveys}
-          loading={loading}
-          rowKey="id"
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => 
-              `${range[0]}-${range[1]} of ${total} 설문`
-          }}
-        />
-      </Card>
-    </div>
+    </Layout>
   );
 }
