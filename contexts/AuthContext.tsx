@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profileError) {
         console.error('Error fetching user profile:', profileError);
-        return null;
+        // users 테이블에 데이터가 없어도 user_metadata를 사용해서 사용자 정보 생성
       }
 
       return userProfile || {
