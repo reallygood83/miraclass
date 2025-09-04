@@ -41,40 +41,90 @@ export default function DashboardPage() {
     recentActivity: []
   });
   const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const router = useRouter();
 
+  // 클라이언트 사이드임을 확인
   useEffect(() => {
-    console.log('🏠 Dashboard component mounted');
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) {
+      console.log('⏳ Waiting for client-side hydration...');
+      return;
+    }
+
+    if (authChecked) {
+      console.log('🔒 Authentication already checked');
+      return;
+    }
+
+    console.log('🏠 Dashboard component mounted (client-side)');
     
-    // 클라이언트 사이드에서만 토큰 체크
-    const checkAuth = () => {
-      const token = authUtils.getToken();
-      console.log('🔍 Token check:', token ? 'Found' : 'Missing');
-      
-      if (!token) {
-        console.log('❌ No token found, redirecting to login');
-        window.location.href = '/auth/login';
-        return false;
-      }
+    const checkAuth = async () => {
+      try {
+        // 다중 안전장치
+        if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+          console.log('⚠️ Browser environment not ready, waiting...');
+          setTimeout(checkAuth, 200);
+          return;
+        }
 
-      const userData = authUtils.getUserFromToken(token);
-      console.log('👤 User data from token:', userData);
-      
-      if (!userData) {
-        console.log('❌ Invalid token, redirecting to login');
-        window.location.href = '/auth/login';
-        return false;
-      }
+        // 토큰 확인
+        const token = authUtils.getToken();
+        console.log('🔍 Token check:', token ? 'Found' : 'Missing');
+        
+        if (!token) {
+          console.log('❌ No token found, redirecting to login');
+          setAuthChecked(true);
+          window.location.replace('/auth/login');
+          return;
+        }
 
-      console.log('✅ Dashboard authenticated successfully for user:', userData.name);
-      setUser(userData);
-      fetchDashboardData();
-      return true;
+        // 토큰에서 사용자 정보 추출
+        const userData = authUtils.getUserFromToken(token);
+        console.log('👤 User data from token:', userData);
+        
+        if (!userData) {
+          console.log('❌ Invalid token, clearing and redirecting');
+          authUtils.removeToken();
+          setAuthChecked(true);
+          window.location.replace('/auth/login');
+          return;
+        }
+
+        // 토큰 만료 체크
+        if (!authUtils.isLoggedIn()) {
+          console.log('❌ Token expired, clearing and redirecting');
+          authUtils.removeToken();
+          setAuthChecked(true);
+          window.location.replace('/auth/login');
+          return;
+        }
+
+        console.log('✅ Dashboard authenticated successfully for user:', userData.name);
+        setUser(userData);
+        setAuthChecked(true);
+        setLoading(false);
+        fetchDashboardData();
+        
+      } catch (error) {
+        console.error('💥 Authentication error:', error);
+        authUtils.removeToken();
+        setAuthChecked(true);
+        window.location.replace('/auth/login');
+      }
     };
 
-    // 컴포넌트 마운트 후 즉시 체크
-    checkAuth();
-  }, [router]);
+    // 더 안전한 지연 실행
+    const timeoutId = setTimeout(() => {
+      checkAuth();
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [isClient, authChecked, router]);
 
   const fetchDashboardData = async () => {
     try {
@@ -118,14 +168,44 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) {
+  // 서버사이드 렌더링 중이거나 인증 체크 중이거나 로딩 중
+  if (!isClient || !authChecked || loading) {
     return (
-      <div style={{ padding: '24px', textAlign: 'center' }}>
-        <div>로딩 중...</div>
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ 
+          background: 'white', 
+          padding: '40px', 
+          borderRadius: '12px', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '18px', color: '#666', marginBottom: '16px' }}>
+            {!isClient ? '🔄 시스템 초기화 중...' : 
+             !authChecked ? '🔐 인증 확인 중...' : 
+             '📊 대시보드 로딩 중...'}
+          </div>
+          {!isClient && (
+            <div style={{ fontSize: '14px', color: '#999' }}>
+              클라이언트 환경을 준비하고 있습니다
+            </div>
+          )}
+          {isClient && !authChecked && (
+            <div style={{ fontSize: '14px', color: '#999' }}>
+              로그인 상태를 확인하고 있습니다
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
+  // 사용자 정보가 없으면 null 반환 (인증 실패시 리다이렉트됨)
   if (!user) {
     return null;
   }
