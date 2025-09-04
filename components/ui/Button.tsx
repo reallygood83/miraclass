@@ -1,35 +1,21 @@
-import { ButtonHTMLAttributes, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { Button as AntButton } from 'antd';
-import { ButtonProps as AntButtonProps } from 'antd/es/button';
+import { ButtonProps as AntButtonProps } from 'antd';
 
-interface CustomButtonProps extends Omit<AntButtonProps, 'type'> {
+interface CustomButtonProps extends AntButtonProps {
   children: ReactNode;
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  size?: 'small' | 'middle' | 'large';
 }
 
 export default function Button({ 
   children, 
-  variant = 'primary', 
+  type = 'primary',
   size = 'middle',
   ...props 
 }: CustomButtonProps) {
-  const getButtonType = (variant: string) => {
-    switch (variant) {
-      case 'primary': return 'primary';
-      case 'danger': return 'primary';
-      case 'ghost': return 'ghost';
-      default: return 'default';
-    }
-  };
-
-  const isDanger = variant === 'danger';
-
   return (
     <AntButton
-      type={getButtonType(variant)}
+      type={type}
       size={size}
-      danger={isDanger}
       {...props}
     >
       {children}

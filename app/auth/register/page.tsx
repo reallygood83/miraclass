@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Form, Input, Button, Card, Typography, Alert, Space, Select } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined, SchoolOutlined, TeamOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, MailOutlined, BankOutlined, UsergroupAddOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 
 const { Title, Paragraph } = Typography;
@@ -150,7 +150,7 @@ export default function RegisterPage() {
               ]}
             >
               <Input 
-                prefix={<SchoolOutlined />} 
+                prefix={<BankOutlined />} 
                 placeholder="학교명을 입력하세요"
               />
             </Form.Item>

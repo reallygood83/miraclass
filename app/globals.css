@@ -1,4 +1,4 @@
-@import '~antd/dist/antd.css';
+/* Ant Design v5는 CSS-in-JS 방식이므로 별도 CSS import 불필요 */
 
 * {
   box-sizing: border-box;
