@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, name, password, role = 'student', school_name, grade, class_number } = await request.json();
+    const { email, name, password, confirmPassword, role = 'student', school_name, grade, class_number } = await request.json();
 
     // 입력 검증
     if (!email || !name || !password || !role) {
@@ -149,8 +149,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Registration error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      code: (error as any)?.code,
+      details: (error as any)?.details
+    });
     return NextResponse.json(
-      { error: '서버 오류가 발생했습니다.' },
+      { 
+        error: '서버 오류가 발생했습니다.',
+        debug: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
+      },
       { status: 500 }
     );
   }
