@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 
-// 보호가 필요한 경로들 (대시보드는 클라이언트에서 인증 처리)
-const protectedPaths = ['/profile', '/classes', '/settings'];
+// 보호가 필요한 경로들 (대시보드와 설정은 클라이언트에서 인증 처리)
+const protectedPaths = ['/profile', '/classes'];
 const authPaths = ['/auth/login', '/auth/register'];
 
 export function middleware(request: NextRequest) {
