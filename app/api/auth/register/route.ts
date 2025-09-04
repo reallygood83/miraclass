@@ -5,10 +5,24 @@ import jwt from 'jsonwebtoken';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, name, password, confirmPassword, role = 'student', school_name, grade, class_number } = await request.json();
+    const requestBody = await request.json();
+    console.log('Registration request body:', requestBody);
+    
+    const { email, name, password, confirmPassword, role = 'student', school_name, grade, class_number } = requestBody;
 
     // 입력 검증
+    console.log('Validation check:', { 
+      email: !!email, 
+      name: !!name, 
+      password: !!password, 
+      role: !!role,
+      emailValue: email,
+      nameValue: name,
+      roleValue: role
+    });
+
     if (!email || !name || !password || !role) {
+      console.log('Validation failed - missing required fields');
       return NextResponse.json(
         { error: '필수 필드를 모두 입력해주세요.' },
         { status: 400 }
@@ -16,6 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (password.length < 6) {
+      console.log('Validation failed - password too short:', password.length);
       return NextResponse.json(
         { error: '비밀번호는 최소 6자 이상이어야 합니다.' },
         { status: 400 }
@@ -24,6 +39,7 @@ export async function POST(request: NextRequest) {
 
     // 역할별 추가 검증
     if (role === 'teacher' && !school_name) {
+      console.log('Validation failed - teacher without school_name');
       return NextResponse.json(
         { error: '교사 등록 시 학교명이 필요합니다.' },
         { status: 400 }
@@ -36,6 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 이메일 중복 확인
+    console.log('Checking email duplication for:', email.toLowerCase());
     const { data: existingUsers, error: checkError } = await supabaseAdmin
       .from('users')
       .select('id')
@@ -43,15 +60,19 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (checkError) {
+      console.log('Database error during email check:', checkError);
       throw checkError;
     }
 
     if (existingUsers && existingUsers.length > 0) {
+      console.log('Email already exists:', email.toLowerCase());
       return NextResponse.json(
         { error: '이미 등록된 이메일입니다.' },
         { status: 400 }
       );
     }
+
+    console.log('Email check passed - no existing user found');
 
     // 학교 찾기 또는 생성 (교사의 경우)
     let school_id = null;
