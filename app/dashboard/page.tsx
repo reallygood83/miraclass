@@ -45,27 +45,35 @@ export default function DashboardPage() {
 
   useEffect(() => {
     console.log('🏠 Dashboard component mounted');
-    const token = authUtils.getToken();
-    console.log('🔍 Token check:', token ? 'Found' : 'Missing');
     
-    if (!token) {
-      console.log('❌ No token found, redirecting to login');
-      router.push('/auth/login');
-      return;
-    }
+    // 클라이언트 사이드에서만 토큰 체크
+    const checkAuth = () => {
+      const token = authUtils.getToken();
+      console.log('🔍 Token check:', token ? 'Found' : 'Missing');
+      
+      if (!token) {
+        console.log('❌ No token found, redirecting to login');
+        window.location.href = '/auth/login';
+        return false;
+      }
 
-    const userData = authUtils.getUserFromToken(token);
-    console.log('👤 User data from token:', userData);
-    
-    if (!userData) {
-      console.log('❌ Invalid token, redirecting to login');
-      router.push('/auth/login');
-      return;
-    }
+      const userData = authUtils.getUserFromToken(token);
+      console.log('👤 User data from token:', userData);
+      
+      if (!userData) {
+        console.log('❌ Invalid token, redirecting to login');
+        window.location.href = '/auth/login';
+        return false;
+      }
 
-    console.log('✅ Dashboard authenticated successfully for user:', userData.name);
-    setUser(userData);
-    fetchDashboardData();
+      console.log('✅ Dashboard authenticated successfully for user:', userData.name);
+      setUser(userData);
+      fetchDashboardData();
+      return true;
+    };
+
+    // 컴포넌트 마운트 후 즉시 체크
+    checkAuth();
   }, [router]);
 
   const fetchDashboardData = async () => {
