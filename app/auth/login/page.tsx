@@ -55,11 +55,9 @@ export default function LoginPage() {
         
         console.log('🔄 Redirecting to dashboard...');
         
-        // 토큰 저장 완료 후 약간의 지연을 두고 리다이렉트
-        setTimeout(() => {
-          console.log('🚀 Executing redirect to dashboard');
-          window.location.href = '/dashboard';
-        }, 100);
+        // 즉시 리다이렉트 (강제)
+        console.log('🚀 Executing immediate redirect to dashboard');
+        window.location.replace('/dashboard');
       } else {
         console.error('❌ Login failed:', data.error);
         setError(data.error || '로그인에 실패했습니다.');
