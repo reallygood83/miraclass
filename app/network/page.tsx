@@ -26,6 +26,7 @@ import {
   ReloadOutlined
 } from '@ant-design/icons';
 import RelationshipNetwork from '@/components/network/RelationshipNetwork';
+import Layout from '@/components/common/Layout';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -39,12 +40,51 @@ interface NetworkAnalysisStats {
   bridgeStudents: number;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'teacher' | 'student';
+  school_id?: string;
+  grade?: number;
+  class_number?: number;
+}
+
 export default function NetworkAnalysisPage() {
+  const [user, setUser] = useState<User | null>(null);
   const [selectedClass, setSelectedClass] = useState('6학년 1반');
   const [analysisStats, setAnalysisStats] = useState<NetworkAnalysisStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [networkKey, setNetworkKey] = useState(0);
+  const [isClient, setIsClient] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const router = useRouter();
+
+  // 클라이언트 사이드임을 확인
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) {
+      return;
+    }
+
+    if (authChecked) {
+      return;
+    }
+
+    // 테스트를 위한 더미 사용자 설정
+    const dummyUser: User = {
+      id: '1',
+      name: '김선생',
+      email: 'teacher@test.com',
+      role: 'teacher'
+    };
+
+    setUser(dummyUser);
+    setAuthChecked(true);
+  }, [isClient, authChecked, router]);
 
   useEffect(() => {
     loadNetworkAnalysis();
@@ -91,8 +131,41 @@ export default function NetworkAnalysisPage() {
     router.push('/analytics');
   };
 
+  // 서버사이드 렌더링 중이거나 인증 체크 중
+  if (!isClient || !authChecked) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ 
+          background: 'white', 
+          padding: '40px', 
+          borderRadius: '12px', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '18px', color: '#666', marginBottom: '16px' }}>
+            {!isClient ? '🔄 시스템 초기화 중...' : 
+             !authChecked ? '🔐 인증 확인 중...' : 
+             '📊 네트워크 로딩 중...'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 사용자 정보가 없으면 null 반환
+  if (!user) {
+    return null;
+  }
+
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+    <Layout user={{ name: user.name, role: user.role }}>
+      <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* 헤더 */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
@@ -346,6 +419,7 @@ export default function NetworkAnalysisPage() {
           </Space>
         </div>
       </Card>
-    </div>
+      </div>
+    </Layout>
   );
 }

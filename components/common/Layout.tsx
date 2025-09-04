@@ -8,7 +8,8 @@ import {
   EyeOutlined,
   SettingOutlined,
   LogoutOutlined,
-  MenuOutlined
+  MenuOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 import Link from 'next/link';
 
@@ -32,26 +33,31 @@ export default function Layout({ children, user }: LayoutProps) {
     },
     {
       key: '2',
+      icon: <TeamOutlined />,
+      label: <Link href="/classes">학급 관리</Link>,
+    },
+    {
+      key: '3',
       icon: <FormOutlined />,
       label: <Link href="/surveys">설문 관리</Link>,
     },
     {
-      key: '3',
+      key: '4',
       icon: <ShareAltOutlined />,
       label: <Link href="/network">관계 네트워크</Link>,
     },
     {
-      key: '4',
+      key: '5',
       icon: <BarChartOutlined />,
       label: <Link href="/analytics">AI 분석</Link>,
     },
     {
-      key: '5',
+      key: '6',
       icon: <EyeOutlined />,
       label: <Link href="/monitoring">실시간 모니터링</Link>,
     },
     {
-      key: '6',
+      key: '7',
       icon: <SettingOutlined />,
       label: <Link href="/settings">설정</Link>,
     },
