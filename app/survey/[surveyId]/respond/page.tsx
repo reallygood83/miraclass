@@ -52,7 +52,7 @@ interface Survey {
   anonymous: boolean;
 }
 
-interface Response {
+interface QuestionResponse {
   questionId: string;
   selectedStudents: string[];
 }
@@ -65,7 +65,7 @@ export default function SurveyResponsePage() {
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
-  const [responses, setResponses] = useState<Response[]>([]);
+  const [responses, setResponses] = useState<QuestionResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [studentInfo, setStudentInfo] = useState<{ name: string; number: number } | null>(null);
@@ -166,7 +166,7 @@ export default function SurveyResponsePage() {
       setSurvey(currentSurvey);
       
       // 응답 배열 초기화
-      const initialResponses: Response[] = currentSurvey.questions.map((q: SurveyQuestion) => ({
+      const initialResponses: QuestionResponse[] = currentSurvey.questions.map((q: SurveyQuestion) => ({
         questionId: q.id,
         selectedStudents: []
       }));

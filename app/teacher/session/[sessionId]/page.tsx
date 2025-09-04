@@ -56,8 +56,9 @@ interface Survey {
   }>;
 }
 
-interface Response {
+interface SurveyResponse {
   id: string;
+  surveyId: string;
   studentName?: string;
   submittedAt: string;
   responses: Array<{
@@ -72,7 +73,7 @@ export default function SessionDetailPage() {
   const sessionId = params.sessionId as string;
   
   const [survey, setSurvey] = useState<Survey | null>(null);
-  const [responses, setResponses] = useState<Response[]>([]);
+  const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [shareModalVisible, setShareModalVisible] = useState(false);
 
@@ -148,7 +149,7 @@ export default function SessionDetailPage() {
       const allResponses = storedResponses ? JSON.parse(storedResponses) : [];
       
       // 현재 설문의 응답만 필터링
-      const sessionResponses = allResponses.filter((r: Response) => r.surveyId === sessionId);
+      const sessionResponses = allResponses.filter((r: SurveyResponse) => r.surveyId === sessionId);
       setResponses(sessionResponses);
       
     } catch (error) {
