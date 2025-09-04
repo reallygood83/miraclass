@@ -32,8 +32,12 @@ import {
   AlertOutlined,
   CheckCircleOutlined,
   ReloadOutlined,
-  DownloadOutlined
+  DownloadOutlined,
+  DatabaseOutlined,
+  DisconnectOutlined
 } from '@ant-design/icons';
+import Layout from '@/components/common/Layout';
+import { supabase, db } from '@/lib/supabase';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -59,22 +63,178 @@ interface ClassAnalysis {
   studentAnalyses: StudentInsight[];
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'teacher' | 'student';
+  school_id?: string;
+  grade?: number;
+  class_number?: number;
+}
+
 export default function AnalyticsPage() {
+  const [user, setUser] = useState<User | null>(null);
   const [selectedClass, setSelectedClass] = useState('6학년 1반');
   const [analysisData, setAnalysisData] = useState<ClassAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [isClient, setIsClient] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+  const [connectionLoading, setConnectionLoading] = useState(true);
   const router = useRouter();
 
+  // 클라이언트 사이드임을 확인
   useEffect(() => {
-    loadAnalysisData();
-  }, [selectedClass]);
+    setIsClient(true);
+  }, []);
 
-  const loadAnalysisData = async () => {
+  useEffect(() => {
+    if (!isClient) {
+      return;
+    }
+
+    if (authChecked) {
+      return;
+    }
+
+    // 테스트를 위한 더미 사용자 설정
+    const dummyUser: User = {
+      id: '1',
+      name: '김선생',
+      email: 'teacher@test.com',
+      role: 'teacher'
+    };
+
+    setUser(dummyUser);
+    setAuthChecked(true);
+  }, [isClient, authChecked, router]);
+
+  useEffect(() => {
+    if (authChecked) {
+      initializeConnection();
+    }
+  }, [selectedClass, authChecked]);
+
+  const initializeConnection = async () => {
+    setConnectionLoading(true);
+    try {
+      // Supabase 연결 테스트
+      const { data: testData, error: testError } = await supabase
+        .from('network_analysis')
+        .select('count')
+        .limit(1);
+      
+      if (!testError) {
+        setIsSupabaseConnected(true);
+        await loadAnalysisDataFromSupabase();
+      } else {
+        console.warn('Supabase 연결 실패, 더미 모드로 전환:', testError.message);
+        setIsSupabaseConnected(false);
+        loadDummyAnalysisData();
+      }
+    } catch (error) {
+      console.warn('Supabase 연결 중 오류:', error);
+      setIsSupabaseConnected(false);
+      loadDummyAnalysisData();
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  const loadAnalysisDataFromSupabase = async () => {
     setLoading(true);
     
     try {
-      // 시뮬레이션 데이터 - 실제 구현에서는 관계 분석 API 호출
+      // 선택된 클래스 정보 가져오기
+      const { data: classesData } = await db.getClasses('550e8400-e29b-41d4-a716-446655440000');
+      const selectedClassData = classesData?.find(c => c.name === selectedClass);
+      
+      if (selectedClassData) {
+        // 네트워크 분석 데이터 조회
+        const { data: networkData, error: networkError } = await supabase
+          .from('network_analysis')
+          .select('*')
+          .eq('class_id', selectedClassData.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        // 학생 데이터 조회
+        const { data: studentsData } = await db.getStudents(selectedClassData.id);
+        
+        // 관계 데이터 조회
+        const { data: relationshipsData, error: relationshipsError } = await supabase
+          .from('student_relationships')
+          .select('student_id, friend_id, relationship_type, strength')
+          .eq('survey_id', 'latest'); // 최신 설문 결과
+
+        if (networkData && !networkError && studentsData) {
+          // Supabase 데이터를 분석 결과 형태로 변환
+          const analysisData: ClassAnalysis = {
+            networkHealth: Math.round((networkData.network_density || 0) * 100),
+            cohesionScore: Math.round((networkData.average_connections || 0) * 10),
+            totalConnections: networkData.total_connections || 0,
+            averageConnections: parseFloat(networkData.average_connections) || 0,
+            networkDensity: parseFloat(networkData.network_density) || 0,
+            insights: [
+              `전반적으로 ${networkData.network_density > 0.5 ? '건강한' : '개선이 필요한'} 관계 네트워크를 형성하고 있습니다.`,
+              `네트워크 밀도가 ${Math.round((networkData.network_density || 0) * 100)}%로 ${networkData.network_density > 0.3 ? '양호한' : '낮은'} 수준입니다.`,
+              `${networkData.isolated_students}명의 학생이 소외 위험군으로 분류되어 특별한 관심이 필요합니다.`,
+              `${networkData.popular_students}명의 인기 학생과 ${networkData.bridge_students}명의 브릿지 학생이 있습니다.`
+            ],
+            recommendations: [
+              '소외 위험군 학생들을 위한 소그룹 활동을 구성해주세요.',
+              '다양한 학생들과의 협력 기회를 제공하는 프로젝트를 진행해주세요.',
+              '브릿지 역할을 하는 학생들을 활용하여 네트워크 연결성을 강화해주세요.',
+              '정기적인 관계 분석을 통해 변화를 모니터링해주세요.'
+            ],
+            studentAnalyses: studentsData?.map(student => ({
+              id: student.id,
+              name: student.name,
+              category: student.risk_level === 'high' ? 'isolated' : 
+                       student.connections > 8 ? 'popular' : 
+                       student.connections > 5 ? 'bridge' : 'normal',
+              riskLevel: student.risk_level,
+              connections: student.connections,
+              insights: [
+                student.risk_level === 'high' ? '소외될 위험이 높습니다' :
+                student.connections > 8 ? '반에서 가장 많은 친구들과 연결되어 있습니다' :
+                '건강한 관계를 유지하고 있습니다'
+              ],
+              recommendations: [
+                student.risk_level === 'high' ? '개별 상담을 통해 관심사를 파악해주세요' :
+                student.connections > 8 ? '다른 학생들을 포용하는 리더십을 발휘할 수 있도록 지도해주세요' :
+                '현재의 긍정적인 관계를 유지하도록 지원해주세요'
+              ]
+            })) || []
+          };
+          
+          setAnalysisData(analysisData);
+          setLastUpdated(new Date().toLocaleString('ko-KR'));
+        } else {
+          // 분석 데이터가 없으면 더미 데이터 사용
+          loadDummyAnalysisData();
+        }
+      } else {
+        loadDummyAnalysisData();
+      }
+      
+    } catch (error) {
+      console.error('Supabase에서 분석 데이터 로드 실패:', error);
+      message.error('분석 데이터를 불러오는데 실패했습니다.');
+      loadDummyAnalysisData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDummyAnalysisData = async () => {
+    setLoading(true);
+    
+    try {
+      // 시뮬레이션 로딩 시간
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       const dummyData: ClassAnalysis = {
@@ -139,7 +299,7 @@ export default function AnalyticsPage() {
       setLastUpdated(new Date().toLocaleString('ko-KR'));
       
     } catch (error) {
-      console.error('Failed to load analysis data:', error);
+      console.error('더미 데이터 로드 실패:', error);
       message.error('분석 데이터를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
@@ -181,7 +341,11 @@ export default function AnalyticsPage() {
   };
 
   const handleRefresh = () => {
-    loadAnalysisData();
+    if (isSupabaseConnected) {
+      loadAnalysisDataFromSupabase();
+    } else {
+      loadDummyAnalysisData();
+    }
     message.success('분석 데이터가 새로고침되었습니다.');
   };
 
@@ -189,44 +353,102 @@ export default function AnalyticsPage() {
     message.info('분석 보고서 내보내기 기능이 준비 중입니다.');
   };
 
-  if (loading && !analysisData) {
+  // 서버사이드 렌더링 중이거나 인증 체크 중
+  if (!isClient || !authChecked) {
     return (
       <div style={{ 
+        minHeight: '100vh', 
         display: 'flex', 
-        flexDirection: 'column',
-        justifyContent: 'center', 
         alignItems: 'center', 
-        minHeight: '400px' 
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
-        <Spin size="large" />
-        <Text style={{ marginTop: '16px', color: '#666' }}>
-          AI가 관계 데이터를 분석하고 있습니다...
-        </Text>
+        <div style={{ 
+          background: 'white', 
+          padding: '40px', 
+          borderRadius: '12px', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '18px', color: '#666', marginBottom: '16px' }}>
+            {!isClient ? '🔄 시스템 초기화 중...' : 
+             !authChecked ? '🔐 인증 확인 중...' : 
+             '📊 분석 로딩 중...'}
+          </div>
+        </div>
       </div>
     );
   }
 
+  // 사용자 정보가 없으면 null 반환
+  if (!user) {
+    return null;
+  }
+
+  if (loading && !analysisData) {
+    return (
+      <Layout user={{ name: user.name, role: user.role }}>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '400px' 
+        }}>
+          <Spin size="large" />
+          <Text style={{ marginTop: '16px', color: '#666' }}>
+            AI가 관계 데이터를 분석하고 있습니다...
+          </Text>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* 헤더 */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
-          <div>
-            <Title level={2}>
-              <BulbOutlined style={{ marginRight: '8px', color: '#faad14' }} />
-              AI 관계 분석 결과
-            </Title>
-            <Text type="secondary">
-              인공지능이 분석한 학급 관계 패턴과 개선 방안을 확인하세요.
-            </Text>
-            {lastUpdated && (
-              <div style={{ marginTop: '8px' }}>
-                <Text type="secondary" style={{ fontSize: '12px' }}>
-                  마지막 업데이트: {lastUpdated}
+    <Layout user={{ name: user.name, role: user.role }}>
+      <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+        {/* 헤더 */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
+            <div>
+              <Title level={2}>
+                <BulbOutlined style={{ marginRight: '8px', color: '#faad14' }} />
+                AI 관계 분석 결과
+              </Title>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text type="secondary">
+                  인공지능이 분석한 학급 관계 패턴과 개선 방안을 확인하세요.
                 </Text>
+                
+                {!connectionLoading && (
+                  <Alert
+                    message={
+                      isSupabaseConnected ? (
+                        <span>
+                          <DatabaseOutlined style={{ color: '#52c41a', marginRight: '4px' }} />
+                          DB 연결됨
+                        </span>
+                      ) : (
+                        <span>
+                          <DisconnectOutlined style={{ color: '#faad14', marginRight: '4px' }} />
+                          더미 모드
+                        </span>
+                      )
+                    }
+                    type={isSupabaseConnected ? 'success' : 'warning'}
+                    showIcon={false}
+                    style={{ minWidth: '120px' }}
+                  />
+                )}
               </div>
-            )}
-          </div>
+              {lastUpdated && (
+                <div style={{ marginTop: '8px' }}>
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    마지막 업데이트: {lastUpdated}
+                  </Text>
+                </div>
+              )}
+            </div>
           
           <Space>
             <Select
@@ -511,6 +733,7 @@ export default function AnalyticsPage() {
           </Card>
         </>
       )}
-    </div>
+      </div>
+    </Layout>
   );
 }

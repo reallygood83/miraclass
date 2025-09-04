@@ -35,24 +35,19 @@ import {
   AlertOutlined,
   CheckCircleOutlined,
   InfoCircleOutlined,
-  SettingOutlined
+  SettingOutlined,
+  DatabaseOutlined,
+  DisconnectOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Layout from '@/components/common/Layout';
+import { supabase, db, MonitoringAlert } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
-interface MonitoringAlert {
-  id: string;
-  type: 'isolation_risk' | 'network_change' | 'conflict_detected' | 'positive_change';
-  severity: 'high' | 'medium' | 'low';
-  studentName: string;
-  message: string;
-  timestamp: string;
-  isRead: boolean;
-}
+// MonitoringAlert interface는 이제 /lib/supabase.ts에서 import
 
 interface NetworkTrend {
   date: string;
@@ -95,6 +90,8 @@ export default function MonitoringPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+  const [connectionLoading, setConnectionLoading] = useState(true);
   const router = useRouter();
 
   // 클라이언트 사이드임을 확인
@@ -125,42 +122,148 @@ export default function MonitoringPage() {
 
   useEffect(() => {
     if (authChecked) {
-      loadMonitoringData();
+      initializeConnection();
     }
   }, [selectedClass, dateRange, authChecked]);
 
-  const loadMonitoringData = async () => {
+  const initializeConnection = async () => {
+    setConnectionLoading(true);
+    try {
+      // Supabase 연결 테스트
+      const { data: testData, error: testError } = await supabase
+        .from('monitoring_alerts')
+        .select('count')
+        .limit(1);
+      
+      if (!testError) {
+        setIsSupabaseConnected(true);
+        await loadMonitoringDataFromSupabase();
+      } else {
+        console.warn('Supabase 연결 실패, 더미 모드로 전환:', testError.message);
+        setIsSupabaseConnected(false);
+        loadDummyMonitoringData();
+      }
+    } catch (error) {
+      console.warn('Supabase 연결 중 오류:', error);
+      setIsSupabaseConnected(false);
+      loadDummyMonitoringData();
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  const loadMonitoringDataFromSupabase = async () => {
     setLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 선택된 클래스 정보 가져오기
+      const { data: classesData } = await db.getClasses('550e8400-e29b-41d4-a716-446655440000');
+      const selectedClassData = classesData?.find(c => c.name === selectedClass);
       
+      if (selectedClassData) {
+        // 해당 클래스의 알림 데이터 로드
+        const { data: alertsData } = await db.getAlerts(selectedClassData.id);
+        
+        if (alertsData) {
+          // Supabase 데이터를 UI 형식에 맞게 변환
+          const convertedAlerts: MonitoringAlert[] = alertsData.map((alert: any) => ({
+            ...alert,
+            studentName: '학생명 없음', // 학생 정보는 별도 조인이 필요
+            timestamp: alert.created_at,
+            isRead: alert.is_read
+          }));
+          
+          setAlerts(convertedAlerts);
+        }
+        
+        // 학생 데이터 로드
+        const { data: studentsData } = await db.getStudents(selectedClassData.id);
+        
+        if (studentsData) {
+          const studentMonitoringData: StudentMonitoring[] = studentsData.map((student: any) => ({
+            id: student.id,
+            name: student.name,
+            riskLevel: student.risk_level || 'low',
+            connectionCount: student.connections || 0,
+            recentChange: 'stable', // 기본값
+            lastAnalysis: student.last_survey ? '분석됨' : '분석 필요',
+            alerts: alertsData?.filter((alert: any) => alert.student_id === student.id) || []
+          }));
+          
+          setStudentMonitoring(studentMonitoringData);
+        }
+      }
+      
+      // 네트워크 트렌드 데이터 (더미로 유지)
+      const dummyTrends: NetworkTrend[] = [
+        { date: '2025-01-18', networkHealth: 75, activeConnections: 80, isolatedCount: 3 },
+        { date: '2025-01-19', networkHealth: 77, activeConnections: 82, isolatedCount: 3 },
+        { date: '2025-01-20', networkHealth: 78, activeConnections: 84, isolatedCount: 2 },
+        { date: '2025-01-21', networkHealth: 76, activeConnections: 81, isolatedCount: 3 },
+        { date: '2025-01-22', networkHealth: 78, activeConnections: 84, isolatedCount: 2 },
+        { date: '2025-01-23', networkHealth: 79, activeConnections: 86, isolatedCount: 2 },
+        { date: '2025-01-24', networkHealth: 78, activeConnections: 84, isolatedCount: 2 }
+      ];
+      
+      setNetworkTrends(dummyTrends);
+      
+    } catch (error) {
+      console.error('Supabase에서 모니터링 데이터 로드 실패:', error);
+      message.error('모니터링 데이터를 불러오는데 실패했습니다.');
+      loadDummyMonitoringData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDummyMonitoringData = () => {
+    setLoading(true);
+    
+    try {
       // 더미 알림 데이터
       const dummyAlerts: MonitoringAlert[] = [
         {
           id: '1',
+          class_id: 'dummy-class-1',
+          student_id: 'dummy-student-22',
           type: 'isolation_risk',
           severity: 'high',
-          studentName: '이채원',
+          title: '소외 위험 감지',
           message: '지난 주 대비 연결 수가 50% 감소했습니다. 개별 상담이 필요할 수 있습니다.',
+          is_read: false,
+          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          studentName: '이채원',
           timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
           isRead: false
         },
         {
           id: '2',
+          class_id: 'dummy-class-1',
+          student_id: 'dummy-student-15',
           type: 'positive_change',
           severity: 'low',
-          studentName: '정현수',
+          title: '긍정적 변화',
           message: '새로운 친구 관계를 형성하며 연결 수가 증가했습니다.',
+          is_read: false,
+          created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+          studentName: '정현수',
           timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
           isRead: false
         },
         {
           id: '3',
+          class_id: 'dummy-class-1',
+          student_id: 'dummy-student-1',
           type: 'network_change',
           severity: 'medium',
-          studentName: '김민수',
+          title: '네트워크 변화',
           message: '네트워크 중심 역할이 강화되어 과도한 부담이 있을 수 있습니다.',
+          is_read: true,
+          created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          studentName: '김민수',
           timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
           isRead: true
         }
@@ -213,8 +316,7 @@ export default function MonitoringPage() {
       setStudentMonitoring(dummyStudentMonitoring);
       
     } catch (error) {
-      console.error('Failed to load monitoring data:', error);
-      message.error('모니터링 데이터를 불러오는데 실패했습니다.');
+      console.error('더미 데이터 로드 실패:', error);
     } finally {
       setLoading(false);
     }
@@ -262,10 +364,18 @@ export default function MonitoringPage() {
     return trendMap[change as keyof typeof trendMap] || <UserOutlined />;
   };
 
-  const markAlertAsRead = (alertId: string) => {
+  const markAlertAsRead = async (alertId: string) => {
+    if (isSupabaseConnected) {
+      try {
+        await db.markAlertAsRead(alertId);
+      } catch (error) {
+        console.error('알림 읽음 처리 실패:', error);
+      }
+    }
+    
     setAlerts(prevAlerts =>
       prevAlerts.map(alert =>
-        alert.id === alertId ? { ...alert, isRead: true } : alert
+        alert.id === alertId ? { ...alert, isRead: true, is_read: true } : alert
       )
     );
   };
@@ -321,9 +431,32 @@ export default function MonitoringPage() {
                 </Badge>
               )}
             </Title>
-            <Text type="secondary">
-              학생들의 관계 변화를 실시간으로 모니터링하고 조기 개입 신호를 포착합니다.
-            </Text>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary">
+                학생들의 관계 변화를 실시간으로 모니터링하고 조기 개입 신호를 포착합니다.
+              </Text>
+              
+              {!connectionLoading && (
+                <Alert
+                  message={
+                    isSupabaseConnected ? (
+                      <span>
+                        <DatabaseOutlined style={{ color: '#52c41a', marginRight: '4px' }} />
+                        DB 연결됨
+                      </span>
+                    ) : (
+                      <span>
+                        <DisconnectOutlined style={{ color: '#faad14', marginRight: '4px' }} />
+                        더미 모드
+                      </span>
+                    )
+                  }
+                  type={isSupabaseConnected ? 'success' : 'warning'}
+                  showIcon={false}
+                  style={{ minWidth: '120px' }}
+                />
+              )}
+            </div>
           </div>
           
           <Space>

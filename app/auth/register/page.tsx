@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Form, Input, Button, Card, Typography, Alert, Space, Select } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined, BankOutlined, UsergroupAddOutlined } from '@ant-design/icons';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 const { Title, Paragraph } = Typography;
 const { Option } = Select;
@@ -26,40 +27,45 @@ export default function RegisterPage() {
   const [form] = Form.useForm();
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<'teacher' | 'student'>('student');
+  const { signUp, user } = useAuth();
+
+  // 이미 로그인된 사용자 체크
+  useEffect(() => {
+    if (user) {
+      console.log('🔄 User already logged in, redirecting to dashboard');
+      router.push('/dashboard');
+    }
+  }, [user, router]);
 
   const onFinish = async (values: RegisterForm) => {
-    console.log('🔄 Registration form submitted:', values);
+    console.log('🔄 Supabase registration form submitted:', values);
     setLoading(true);
     setError('');
 
     try {
-      console.log('📤 Making API request to /api/auth/register');
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-
-      console.log('📥 API Response status:', response.status, response.statusText);
-      const data = await response.json();
-      console.log('📄 API Response data:', data);
-
-      if (response.ok) {
-        console.log('✅ Registration successful, redirecting to login...');
-        // 회원가입 성공 시 로그인 페이지로 이동
-        router.push('/auth/login?message=회원가입이 완료되었습니다. 로그인해주세요.');
+      console.log('📤 Using Supabase Auth for registration');
+      const success = await signUp(
+        values.email, 
+        values.password, 
+        values.name, 
+        values.role || 'teacher'
+      );
+      
+      if (success) {
+        console.log('✅ Supabase registration successful');
+        // 회원가입 성공 메시지는 AuthContext에서 처리됨
+        // 로그인 페이지로 이동
+        router.push('/auth/login');
       } else {
-        console.error('❌ Registration failed:', data.error);
-        setError(data.error || '회원가입에 실패했습니다.');
+        console.error('❌ Supabase registration failed');
+        // 에러 메시지는 AuthContext에서 이미 처리됨 (Ant Design message)
       }
     } catch (error) {
-      console.error('💥 Network/Parse error:', error);
-      setError('서버 연결에 실패했습니다.');
+      console.error('💥 Registration error:', error);
+      setError('회원가입 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
-      console.log('🏁 Registration process completed');
+      console.log('🏁 Supabase registration process completed');
     }
   };
 

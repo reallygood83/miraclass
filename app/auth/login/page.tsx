@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Form, Input, Button, Card, Typography, Alert, Space } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, Typography, Alert, Space, message } from 'antd';
+import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import Link from 'next/link';
-import { authUtils } from '@/lib/utils/auth';
+import { useAuth } from '@/contexts/AuthContext';
 
 const { Title, Paragraph } = Typography;
 
@@ -19,79 +19,47 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loginSuccess, setLoginSuccess] = useState(false);
   const router = useRouter();
+  const { signIn, user } = useAuth();
+
+  // 이미 로그인된 사용자 체크
+  useEffect(() => {
+    if (user) {
+      console.log('🔄 User already logged in, redirecting to dashboard');
+      router.push('/dashboard');
+    }
+  }, [user, router]);
 
   const onFinish = async (values: LoginForm) => {
-    console.log('🔄 Login form submitted:', values);
+    console.log('🔄 Supabase login form submitted:', values);
     setLoading(true);
     setError('');
 
     try {
-      console.log('📤 Making API request to /api/auth/login');
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-      });
-
-      console.log('📥 API Response status:', response.status, response.statusText);
-      const data = await response.json();
-      console.log('📄 API Response data:', data);
-
-      if (response.ok) {
-        console.log('✅ Login successful, token received:', data.token ? 'Yes' : 'No');
-        
-        // 토큰 저장 (localStorage와 쿠키에 모두 저장)
-        authUtils.setToken(data.token);
-        
-        // 쿠키에도 토큰 저장 (middleware에서 사용)
-        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
-        
-        console.log('💾 Token stored in localStorage and cookies');
-        
-        // 토큰 확인
-        const storedToken = authUtils.getToken();
-        console.log('🔍 Token verification - stored:', storedToken ? 'Yes' : 'No');
-        
-        // 사용자 정보 확인
-        const userInfo = authUtils.getUserFromToken();
-        console.log('👤 User info from token:', userInfo);
-        
-        console.log('🔄 Setting login success state...');
+      console.log('📤 Using Supabase Auth for login');
+      const success = await signIn(values.email, values.password);
+      
+      if (success) {
+        console.log('✅ Supabase login successful');
         setLoginSuccess(true);
         
-        // 다중 리다이렉트 시도
-        console.log('🚀 Attempting multiple redirect methods');
+        // Supabase Auth를 사용하므로 토큰 관리는 자동으로 처리됨
+        console.log('🚀 Redirecting to dashboard');
         
-        // 방법 1: window.location.href
+        // 간단한 리다이렉트 (Supabase Auth 상태 변경 후)
         setTimeout(() => {
-          console.log('🔄 Method 1: window.location.href');
-          window.location.href = '/dashboard';
-        }, 100);
-        
-        // 방법 2: window.location.replace (백업)
-        setTimeout(() => {
-          console.log('🔄 Method 2: window.location.replace');  
-          window.location.replace('/dashboard');
-        }, 200);
-        
-        // 방법 3: Next.js router (백업)
-        setTimeout(() => {
-          console.log('🔄 Method 3: router.replace');
-          router.replace('/dashboard');
-        }, 300);
+          router.push('/dashboard');
+        }, 1000);
         
       } else {
-        console.error('❌ Login failed:', data.error);
-        setError(data.error || '로그인에 실패했습니다.');
+        console.error('❌ Supabase login failed');
+        // 에러 메시지는 AuthContext에서 이미 처리됨 (Ant Design message)
       }
     } catch (error) {
-      console.error('💥 Network/Parse error:', error);
-      setError('서버 연결에 실패했습니다.');
+      console.error('💥 Login error:', error);
+      setError('로그인 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
-      console.log('🏁 Login process completed');
+      console.log('🏁 Supabase login process completed');
     }
   };
 

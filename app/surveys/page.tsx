@@ -15,7 +15,8 @@ import {
   Tooltip,
   Statistic,
   Row,
-  Col
+  Col,
+  Alert
 } from 'antd';
 import { 
   PlusOutlined,
@@ -25,95 +26,167 @@ import {
   BarChartOutlined,
   UserOutlined,
   ClockCircleOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  DatabaseOutlined,
+  DisconnectOutlined
 } from '@ant-design/icons';
 import Layout from '@/components/common/Layout';
+import { supabase, db, Survey } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 
-interface Survey {
-  id: string;
-  title: string;
-  description: string;
-  targetClass: string;
-  status: 'draft' | 'active' | 'completed' | 'paused';
-  createdAt: string;
-  duration: number;
-  anonymous: boolean;
-  totalQuestions: number;
-  responses: number;
-  totalStudents: number;
-  autoAnalysis: boolean;
-}
+// Survey interface는 이제 /lib/supabase.ts에서 import
 
 export default function SurveysPage() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+  const [connectionLoading, setConnectionLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    loadSurveys();
+    initializeConnection();
   }, []);
 
-  const loadSurveys = async () => {
+  const initializeConnection = async () => {
+    setConnectionLoading(true);
+    try {
+      // Supabase 연결 테스트
+      const { data: testData, error: testError } = await supabase
+        .from('surveys')
+        .select('count')
+        .limit(1);
+      
+      if (!testError) {
+        setIsSupabaseConnected(true);
+        await loadSurveysFromSupabase();
+      } else {
+        console.warn('Supabase 연결 실패, 더미 모드로 전환:', testError.message);
+        setIsSupabaseConnected(false);
+        loadDummySurveys();
+      }
+    } catch (error) {
+      console.warn('Supabase 연결 중 오류:', error);
+      setIsSupabaseConnected(false);
+      loadDummySurveys();
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  const loadSurveysFromSupabase = async () => {
     setLoading(true);
     try {
-      // 실제 API 호출 대신 로컬스토리지에서 데이터 로드
-      const storedSurveys = localStorage.getItem('surveys');
-      const parsedSurveys = storedSurveys ? JSON.parse(storedSurveys) : [];
+      const { data: classesData } = await db.getClasses('550e8400-e29b-41d4-a716-446655440000');
       
-      // 더미 데이터 추가 (실제 구현에서는 제거)
+      if (classesData && classesData.length > 0) {
+        const allSurveys: Survey[] = [];
+        
+        for (const classItem of classesData) {
+          const { data: surveysData } = await db.getSurveys(classItem.id);
+          if (surveysData) {
+            // Supabase 데이터를 Survey 인터페이스에 맞게 변환
+            const convertedSurveys = surveysData.map((survey: any) => ({
+              ...survey,
+              targetClass: classItem.name,
+              duration: 7, // 기본값
+              anonymous: true, // 기본값
+              totalQuestions: Array.isArray(survey.questions) ? survey.questions.length : 0,
+              responses: survey.responses_count || 0,
+              totalStudents: classItem.student_count || 0,
+              autoAnalysis: true, // 기본값
+              createdAt: survey.created_at
+            }));
+            allSurveys.push(...convertedSurveys);
+          }
+        }
+        
+        setSurveys(allSurveys);
+      } else {
+        setSurveys([]);
+      }
+    } catch (error) {
+      console.error('Supabase에서 설문 로드 실패:', error);
+      message.error('설문 목록을 불러오는데 실패했습니다.');
+      setSurveys([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDummySurveys = () => {
+    setLoading(true);
+    try {
       const dummySurveys: Survey[] = [
         {
           id: '1',
           title: '6학년 1반 친구 관계 조사',
           description: '우리 반 친구들과의 관계를 알아보는 설문입니다.',
-          targetClass: '6학년 1반',
+          class_id: 'dummy-class-1',
+          teacher_id: 'dummy-teacher-1',
           status: 'active',
-          createdAt: '2025-01-15',
+          questions: [{}, {}, {}], // 3개 질문
+          responses_count: 22,
+          created_at: '2025-01-15T00:00:00Z',
+          updated_at: '2025-01-15T00:00:00Z',
+          expires_at: null,
+          targetClass: '6학년 1반',
           duration: 7,
           anonymous: true,
           totalQuestions: 3,
           responses: 22,
           totalStudents: 28,
-          autoAnalysis: true
+          autoAnalysis: true,
+          createdAt: '2025-01-15'
         },
         {
           id: '2',
           title: '협력 관계 분석 설문',
           description: '팀 프로젝트와 협력 관계를 분석하는 설문입니다.',
-          targetClass: '6학년 1반',
+          class_id: 'dummy-class-1',
+          teacher_id: 'dummy-teacher-1',
           status: 'completed',
-          createdAt: '2025-01-01',
+          questions: [{}, {}, {}, {}], // 4개 질문
+          responses_count: 28,
+          created_at: '2025-01-01T00:00:00Z',
+          updated_at: '2025-01-01T00:00:00Z',
+          expires_at: null,
+          targetClass: '6학년 1반',
           duration: 14,
           anonymous: true,
           totalQuestions: 4,
           responses: 28,
           totalStudents: 28,
-          autoAnalysis: true
+          autoAnalysis: true,
+          createdAt: '2025-01-01'
         },
         {
           id: '3',
           title: '신뢰 관계 설문',
           description: '친구들 간의 신뢰와 소통에 대한 설문입니다.',
-          targetClass: '6학년 1반',
+          class_id: 'dummy-class-1',
+          teacher_id: 'dummy-teacher-1',
           status: 'draft',
-          createdAt: '2025-01-20',
+          questions: [{}, {}], // 2개 질문
+          responses_count: 0,
+          created_at: '2025-01-20T00:00:00Z',
+          updated_at: '2025-01-20T00:00:00Z',
+          expires_at: null,
+          targetClass: '6학년 1반',
           duration: 7,
           anonymous: true,
           totalQuestions: 2,
           responses: 0,
           totalStudents: 28,
-          autoAnalysis: false
+          autoAnalysis: false,
+          createdAt: '2025-01-20'
         }
       ];
 
-      const combinedSurveys = [...dummySurveys, ...parsedSurveys];
-      setSurveys(combinedSurveys);
-      
+      setSurveys(dummySurveys);
     } catch (error) {
-      console.error('Failed to load surveys:', error);
-      message.error('설문 목록을 불러오는데 실패했습니다.');
+      console.error('더미 데이터 로드 실패:', error);
+      setSurveys([]);
     } finally {
       setLoading(false);
     }
@@ -154,16 +227,20 @@ export default function SurveysPage() {
       okText: '삭제',
       cancelText: '취소',
       okType: 'danger',
-      onOk: () => {
-        const updatedSurveys = surveys.filter(s => s.id !== surveyId);
-        setSurveys(updatedSurveys);
-        
-        // 로컬스토리지에서도 삭제
-        const storedSurveys = JSON.parse(localStorage.getItem('surveys') || '[]');
-        const filteredSurveys = storedSurveys.filter((s: any) => s.id !== surveyId);
-        localStorage.setItem('surveys', JSON.stringify(filteredSurveys));
-        
-        message.success('설문이 삭제되었습니다.');
+      onOk: async () => {
+        if (isSupabaseConnected) {
+          // Supabase에서 삭제
+          // 실제로는 surveys 테이블에 DELETE 메서드가 필요하지만,
+          // 현재는 UI에서만 제거
+          const updatedSurveys = surveys.filter(s => s.id !== surveyId);
+          setSurveys(updatedSurveys);
+          message.success('설문이 삭제되었습니다. (더미 모드)');
+        } else {
+          // 더미 모드에서 삭제
+          const updatedSurveys = surveys.filter(s => s.id !== surveyId);
+          setSurveys(updatedSurveys);
+          message.success('설문이 삭제되었습니다. (더미 모드)');
+        }
       }
     });
   };
@@ -285,9 +362,32 @@ export default function SurveysPage() {
             </Button>
           </div>
           
-          <Text type="secondary">
-            학생 관계 분석을 위한 설문을 생성하고 관리합니다.
-          </Text>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text type="secondary">
+              학생 관계 분석을 위한 설문을 생성하고 관리합니다.
+            </Text>
+            
+            {!connectionLoading && (
+              <Alert
+                message={
+                  isSupabaseConnected ? (
+                    <span>
+                      <DatabaseOutlined style={{ color: '#52c41a', marginRight: '4px' }} />
+                      DB 연결됨
+                    </span>
+                  ) : (
+                    <span>
+                      <DisconnectOutlined style={{ color: '#faad14', marginRight: '4px' }} />
+                      더미 모드
+                    </span>
+                  )
+                }
+                type={isSupabaseConnected ? 'success' : 'warning'}
+                showIcon={false}
+                style={{ minWidth: '120px' }}
+              />
+            )}
+          </div>
         </div>
 
         {/* 통계 카드 */}

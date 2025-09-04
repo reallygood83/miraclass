@@ -15,7 +15,8 @@ import {
   message,
   Spin,
   Empty,
-  Divider
+  Divider,
+  Alert
 } from 'antd';
 import { 
   ShareAltOutlined,
@@ -23,10 +24,13 @@ import {
   TeamOutlined,
   UserOutlined,
   EyeOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  DatabaseOutlined,
+  DisconnectOutlined
 } from '@ant-design/icons';
 import RelationshipNetwork from '@/components/network/RelationshipNetwork';
 import Layout from '@/components/common/Layout';
+import { supabase, db } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -58,6 +62,8 @@ export default function NetworkAnalysisPage() {
   const [networkKey, setNetworkKey] = useState(0);
   const [isClient, setIsClient] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+  const [connectionLoading, setConnectionLoading] = useState(true);
   const router = useRouter();
 
   // 클라이언트 사이드임을 확인
@@ -87,16 +93,87 @@ export default function NetworkAnalysisPage() {
   }, [isClient, authChecked, router]);
 
   useEffect(() => {
-    loadNetworkAnalysis();
-  }, [selectedClass]);
+    if (authChecked) {
+      initializeConnection();
+    }
+  }, [selectedClass, authChecked]);
 
-  const loadNetworkAnalysis = async () => {
+  const initializeConnection = async () => {
+    setConnectionLoading(true);
+    try {
+      // Supabase 연결 테스트
+      const { data: testData, error: testError } = await supabase
+        .from('network_analysis')
+        .select('count')
+        .limit(1);
+      
+      if (!testError) {
+        setIsSupabaseConnected(true);
+        await loadNetworkAnalysisFromSupabase();
+      } else {
+        console.warn('Supabase 연결 실패, 더미 모드로 전환:', testError.message);
+        setIsSupabaseConnected(false);
+        loadDummyNetworkAnalysis();
+      }
+    } catch (error) {
+      console.warn('Supabase 연결 중 오류:', error);
+      setIsSupabaseConnected(false);
+      loadDummyNetworkAnalysis();
+    } finally {
+      setConnectionLoading(false);
+    }
+  };
+
+  const loadNetworkAnalysisFromSupabase = async () => {
     setLoading(true);
     
     try {
-      // 시뮬레이션 데이터 - 실제 구현에서는 API 호출
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 선택된 클래스 정보 가져오기
+      const { data: classesData } = await db.getClasses('550e8400-e29b-41d4-a716-446655440000');
+      const selectedClassData = classesData?.find(c => c.name === selectedClass);
       
+      if (selectedClassData) {
+        // 네트워크 분석 데이터 조회
+        const { data: networkData, error } = await supabase
+          .from('network_analysis')
+          .select('*')
+          .eq('class_id', selectedClassData.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (networkData && !error) {
+          const stats: NetworkAnalysisStats = {
+            totalConnections: networkData.total_connections || 0,
+            averageConnections: parseFloat(networkData.average_connections) || 0,
+            networkDensity: parseFloat(networkData.network_density) || 0,
+            isolatedStudents: networkData.isolated_students || 0,
+            popularStudents: networkData.popular_students || 0,
+            bridgeStudents: networkData.bridge_students || 0
+          };
+          
+          setAnalysisStats(stats);
+        } else {
+          // 분석 데이터가 없으면 더미 데이터 사용
+          loadDummyNetworkAnalysis();
+        }
+      } else {
+        loadDummyNetworkAnalysis();
+      }
+      
+    } catch (error) {
+      console.error('Supabase에서 네트워크 분석 데이터 로드 실패:', error);
+      message.error('네트워크 분석 데이터를 불러오는데 실패했습니다.');
+      loadDummyNetworkAnalysis();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDummyNetworkAnalysis = () => {
+    setLoading(true);
+    
+    try {
       const stats: NetworkAnalysisStats = {
         totalConnections: 84,
         averageConnections: 6.2,
@@ -109,8 +186,7 @@ export default function NetworkAnalysisPage() {
       setAnalysisStats(stats);
       
     } catch (error) {
-      console.error('Failed to load network analysis:', error);
-      message.error('네트워크 분석 데이터를 불러오는데 실패했습니다.');
+      console.error('더미 데이터 로드 실패:', error);
     } finally {
       setLoading(false);
     }
@@ -118,7 +194,11 @@ export default function NetworkAnalysisPage() {
 
   const handleRefresh = () => {
     setNetworkKey(prev => prev + 1);
-    loadNetworkAnalysis();
+    if (isSupabaseConnected) {
+      loadNetworkAnalysisFromSupabase();
+    } else {
+      loadDummyNetworkAnalysis();
+    }
     message.success('네트워크가 새로고침되었습니다.');
   };
 
@@ -174,9 +254,32 @@ export default function NetworkAnalysisPage() {
               <ShareAltOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
               관계 네트워크 분석
             </Title>
-            <Text type="secondary">
-              학생들의 관계를 시각적으로 분석하고 소외 위험군을 조기 발견할 수 있습니다.
-            </Text>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary">
+                학생들의 관계를 시각적으로 분석하고 소외 위험군을 조기 발견할 수 있습니다.
+              </Text>
+              
+              {!connectionLoading && (
+                <Alert
+                  message={
+                    isSupabaseConnected ? (
+                      <span>
+                        <DatabaseOutlined style={{ color: '#52c41a', marginRight: '4px' }} />
+                        DB 연결됨
+                      </span>
+                    ) : (
+                      <span>
+                        <DisconnectOutlined style={{ color: '#faad14', marginRight: '4px' }} />
+                        더미 모드
+                      </span>
+                    )
+                  }
+                  type={isSupabaseConnected ? 'success' : 'warning'}
+                  showIcon={false}
+                  style={{ minWidth: '120px' }}
+                />
+              )}
+            </div>
           </div>
           
           <Space>

@@ -11,7 +11,7 @@ import {
   PlusOutlined,
   EyeOutlined
 } from '@ant-design/icons';
-import { authUtils } from '@/lib/utils/auth';
+import { useAuth } from '@/contexts/AuthContext';
 import RelationshipNetwork from '@/components/network/RelationshipNetwork';
 import Layout from '@/components/common/Layout';
 
@@ -35,7 +35,6 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalClasses: 0,
     totalStudents: 0,
@@ -43,42 +42,25 @@ export default function DashboardPage() {
     recentActivity: []
   });
   const [loading, setLoading] = useState(true);
-  const [isClient, setIsClient] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
-  // 클라이언트 사이드임을 확인
+  // 인증 체크 및 대시보드 데이터 로딩
   useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isClient) {
-      console.log('⏳ Waiting for client-side hydration...');
+    if (authLoading) {
+      console.log('⏳ Auth 상태 확인 중...');
       return;
     }
 
-    if (authChecked) {
-      console.log('🔒 Authentication already checked');
+    if (!user) {
+      console.log('🔒 사용자가 로그인되지 않음. 로그인 페이지로 이동');
+      router.push('/auth/login');
       return;
     }
 
-    console.log('🏠 Dashboard component mounted (client-side)');
-    
-    // 테스트를 위한 더미 사용자 설정
-    const dummyUser: User = {
-      id: '1',
-      name: '김선생',
-      email: 'teacher@test.com',
-      role: 'teacher'
-    };
-
-    console.log('🧪 Using dummy user for testing:', dummyUser.name);
-    setUser(dummyUser);
-    setAuthChecked(true);
-    setLoading(false);
+    console.log('🏠 Dashboard - 인증된 사용자:', user.name);
     fetchDashboardData();
-  }, [isClient, authChecked, router]);
+  }, [user, authLoading, router]);
 
   const fetchDashboardData = async () => {
     try {
@@ -121,8 +103,8 @@ export default function DashboardPage() {
     }
   };
 
-  // 서버사이드 렌더링 중이거나 인증 체크 중이거나 로딩 중
-  if (!isClient || !authChecked || loading) {
+  // 인증 로딩 중이거나 대시보드 데이터 로딩 중
+  if (authLoading || loading) {
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -139,13 +121,11 @@ export default function DashboardPage() {
           textAlign: 'center'
         }}>
           <div style={{ fontSize: '18px', color: '#666', marginBottom: '16px' }}>
-            {!isClient ? '🔄 시스템 초기화 중...' : 
-             !authChecked ? '🔐 인증 확인 중...' : 
-             '📊 대시보드 로딩 중...'}
+            {authLoading ? '🔐 인증 확인 중...' : '📊 대시보드 로딩 중...'}
           </div>
-          {!isClient && (
+          {authLoading && (
             <div style={{ fontSize: '14px', color: '#999' }}>
-              클라이언트 환경을 준비하고 있습니다
+              사용자 인증 상태를 확인하고 있습니다
             </div>
           )}
           {isClient && !authChecked && (
@@ -190,15 +170,15 @@ export default function DashboardPage() {
   };
 
   return (
-    <Layout user={{ name: user.name, role: user.role }}>
+    <Layout>
       <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* 환영 메시지 */}
       <div style={{ marginBottom: '32px' }}>
         <Title level={2}>
-          우리반 커넥트에 오신 것을 환영합니다, {user.name}님! 🌐
+          우리반 커넥트에 오신 것을 환영합니다, {user?.name}님! 🌐
         </Title>
         <Paragraph type="secondary">
-          {user.role === 'teacher' 
+          {user?.role === 'teacher' 
             ? 'AI 기반 학생 관계 분석을 통해 우리 반의 소통과 유대감을 강화해보세요.'
             : '친구들과의 관계를 더 깊이 이해하고 따뜻한 교실을 만들어가요.'
           }

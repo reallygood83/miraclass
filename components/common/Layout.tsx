@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Layout as AntLayout, Menu, Button, Typography, Space } from 'antd';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   HomeOutlined, 
   FormOutlined, 
@@ -18,13 +19,10 @@ const { Title } = Typography;
 
 interface LayoutProps {
   children: ReactNode;
-  user?: {
-    name: string;
-    role: string;
-  } | null;
 }
 
-export default function Layout({ children, user }: LayoutProps) {
+export default function Layout({ children }: LayoutProps) {
+  const { user, signOut } = useAuth();
   const menuItems = [
     {
       key: '1',
@@ -63,10 +61,9 @@ export default function Layout({ children, user }: LayoutProps) {
     },
   ];
 
-  const handleLogout = () => {
-    // 로그아웃 로직
-    localStorage.removeItem('token');
-    window.location.href = '/auth/login';
+  const handleLogout = async () => {
+    console.log('🚪 로그아웃 시도');
+    await signOut();
   };
 
   return (
@@ -87,7 +84,7 @@ export default function Layout({ children, user }: LayoutProps) {
         
         {user && (
           <Space>
-            <span>안녕하세요, {user.name}님 ({user.role})</span>
+            <span>안녕하세요, {user.name}님 ({user.role === 'teacher' ? '교사' : '학생'})</span>
             <Button 
               type="text" 
               icon={<LogoutOutlined />}

@@ -19,7 +19,9 @@ import {
   message,
   Modal,
   Form,
-  Input
+  Input,
+  InputNumber,
+  Spin
 } from 'antd';
 import { 
   ArrowLeftOutlined,
@@ -33,6 +35,7 @@ import {
   BarChartOutlined
 } from '@ant-design/icons';
 import Layout from '@/components/common/Layout';
+import { supabase, db, type User, type Class, type Student } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 
@@ -75,6 +78,7 @@ export default function ClassDetailPage() {
   const [isClient, setIsClient] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAddStudentModalVisible, setIsAddStudentModalVisible] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [form] = Form.useForm();
   const router = useRouter();
   const params = useParams();
@@ -93,90 +97,201 @@ export default function ClassDetailPage() {
       return;
     }
 
-    const dummyUser: User = {
-      id: '1',
-      name: '김선생',
-      email: 'teacher@test.com',
-      role: 'teacher'
-    };
-
-    setUser(dummyUser);
-    setAuthChecked(true);
-    loadClassData();
+    initializeUserAndClass();
   }, [isClient, authChecked, router, classId]);
+
+  const initializeUserAndClass = async () => {
+    try {
+      // Supabase 연결 테스트
+      const { data: testData, error: testError } = await supabase.from('users').select('count').limit(1);
+      
+      if (!testError) {
+        setIsSupabaseConnected(true);
+        // 실제 사용자 조회
+        const { data: userData, error: userError } = await db.getUserByEmail('teacher@test.com');
+        
+        if (userData && !userError) {
+          setUser(userData);
+        } else {
+          // 더미 사용자
+          const dummyUser: User = {
+            id: '550e8400-e29b-41d4-a716-446655440000',
+            name: '김선생',
+            email: 'teacher@test.com',
+            role: 'teacher',
+            school_name: '안양 박달초등학교',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          setUser(dummyUser);
+        }
+        
+        await loadClassData();
+      } else {
+        // Supabase 연결 실패 시 더미 모드
+        console.warn('Supabase 연결 실패, 더미 데이터 모드:', testError);
+        setIsSupabaseConnected(false);
+        const dummyUser: User = {
+          id: '1',
+          name: '김선생',
+          email: 'teacher@test.com',
+          role: 'teacher',
+          school_name: '안양 박달초등학교',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setUser(dummyUser);
+        loadDummyClassData();
+      }
+    } catch (error) {
+      console.error('초기화 오류:', error);
+      message.error('시스템 초기화 중 오류가 발생했습니다.');
+    } finally {
+      setAuthChecked(true);
+      setLoading(false);
+    }
+  };
 
   const loadClassData = async () => {
     setLoading(true);
     try {
-      // 더미 학급 데이터
-      const dummyClass: Class = {
-        id: classId,
-        name: '6학년 1반',
-        grade: 6,
-        class_number: 1,
-        teacher_name: '김선생',
-        student_count: 28,
-        total_surveys: 3,
-        active_surveys: 1,
-        last_analysis: '2시간 전',
-        status: 'active',
-        created_at: '2025-01-15'
-      };
-
-      // 더미 학생 데이터
-      const dummyStudents: Student[] = [
-        {
-          id: '1', name: '김민수', student_number: 1, connections: 8, 
-          risk_level: 'low', last_survey: '1일 전', status: 'active'
-        },
-        {
-          id: '2', name: '이서연', student_number: 2, connections: 6, 
-          risk_level: 'medium', last_survey: '1일 전', status: 'active'
-        },
-        {
-          id: '3', name: '박지원', student_number: 3, connections: 12, 
-          risk_level: 'low', last_survey: '1일 전', status: 'active'
-        },
-        {
-          id: '4', name: '정현우', student_number: 4, connections: 4, 
-          risk_level: 'medium', last_survey: '2일 전', status: 'active'
-        },
-        {
-          id: '5', name: '이채원', student_number: 5, connections: 1, 
-          risk_level: 'high', last_survey: '3일 전', status: 'active'
-        },
-      ];
-
-      setClassData(dummyClass);
-      setStudents(dummyStudents);
+      if (isSupabaseConnected) {
+        // Supabase에서 학급 데이터 로드
+        const { data: classResult, error: classError } = await db.getClass(classId);
+        
+        if (classError) {
+          console.error('Supabase 학급 데이터 로드 오류:', classError);
+          message.error('학급 정보를 불러오는데 실패했습니다.');
+          loadDummyClassData();
+        } else {
+          setClassData(classResult);
+          
+          // 학생 데이터 로드
+          const { data: studentsResult, error: studentsError } = await db.getStudents(classId);
+          
+          if (studentsError) {
+            console.error('실제 학생 데이터 로드 오류:', studentsError);
+            // 학급이 있으면 빈 학생 배열로 시작
+            setStudents([]);
+          } else {
+            setStudents(studentsResult || []);
+          }
+          
+          message.success('학급 데이터를 불러왔습니다.');
+        }
+      } else {
+        loadDummyClassData();
+      }
     } catch (error) {
-      console.error('Failed to load class data:', error);
+      console.error('학급 데이터 로드 오류:', error);
       message.error('학급 정보를 불러오는데 실패했습니다.');
+      loadDummyClassData();
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadDummyClassData = () => {
+    const dummyClass: Class = {
+      id: classId,
+      name: '6학년 1반',
+      grade: 6,
+      class_number: 1,
+      teacher_id: '1',
+      teacher_name: '김선생',
+      student_count: 5,
+      total_surveys: 3,
+      active_surveys: 1,
+      last_analysis: '2시간 전',
+      status: 'active',
+      created_at: '2025-01-15T00:00:00Z',
+      updated_at: '2025-01-15T00:00:00Z'
+    };
+
+    const dummyStudents: Student[] = [
+      {
+        id: '1', name: '김민수', student_number: 1, class_id: classId,
+        connections: 8, risk_level: 'low', last_survey: '1일 전', 
+        status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
+      },
+      {
+        id: '2', name: '이서연', student_number: 2, class_id: classId,
+        connections: 6, risk_level: 'medium', last_survey: '1일 전',
+        status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
+      },
+      {
+        id: '3', name: '박지원', student_number: 3, class_id: classId,
+        connections: 12, risk_level: 'low', last_survey: '1일 전',
+        status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
+      },
+      {
+        id: '4', name: '정현우', student_number: 4, class_id: classId,
+        connections: 4, risk_level: 'medium', last_survey: '2일 전',
+        status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
+      },
+      {
+        id: '5', name: '이채원', student_number: 5, class_id: classId,
+        connections: 1, risk_level: 'high', last_survey: '3일 전',
+        status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
+      }
+    ];
+
+    setClassData(dummyClass);
+    setStudents(dummyStudents);
   };
 
   const handleAddStudent = async () => {
     try {
       const values = await form.validateFields();
       
-      const newStudent: Student = {
-        id: Date.now().toString(),
+      if (!classData) {
+        message.error('학급 정보가 없습니다.');
+        return;
+      }
+      
+      const newStudentData = {
         name: values.name,
         student_number: values.student_number,
+        class_id: classData.id,
         connections: 0,
-        risk_level: 'low',
-        last_survey: '아직 없음',
-        status: 'active'
+        risk_level: 'low' as const,
+        last_survey: null,
+        status: 'active' as const
       };
+      
+      if (isSupabaseConnected) {
+        const { data, error } = await db.createStudent(newStudentData);
+        
+        if (error) {
+          console.error('Supabase 학생 추가 오류:', error);
+          message.error('학생 추가에 실패했습니다.');
+          return;
+        }
+        
+        // 학생 목록 새로고침
+        const { data: updatedStudents } = await db.getStudents(classData.id);
+        setStudents(updatedStudents || []);
+        
+        message.success('학생이 추가되었습니다.');
+      } else {
+        // 더미 모드
+        const newStudent: Student = {
+          id: Date.now().toString(),
+          ...newStudentData,
+          last_survey: '아직 없음',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
 
-      setStudents([...students, newStudent]);
+        setStudents([...students, newStudent]);
+        message.success('학생이 추가되었습니다.');
+      }
+      
       setIsAddStudentModalVisible(false);
       form.resetFields();
-      message.success('학생이 추가되었습니다.');
     } catch (error) {
-      console.error('Failed to add student:', error);
+      console.error('학생 추가 오류:', error);
+      message.error('학생 추가 중 오류가 발생했습니다.');
     }
   };
 
@@ -423,6 +538,11 @@ export default function ClassDetailPage() {
             <Title level={2} style={{ margin: 0 }}>
               <TeamOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
               {classData.name}
+              {isSupabaseConnected ? (
+                <Tag color="green" style={{ marginLeft: '8px', fontSize: '12px' }}>DB 연결됨</Tag>
+              ) : (
+                <Tag color="orange" style={{ marginLeft: '8px', fontSize: '12px' }}>더미 모드</Tag>
+              )}
             </Title>
           </div>
           
