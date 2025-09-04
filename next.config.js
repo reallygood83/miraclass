@@ -8,7 +8,6 @@ const nextConfig = {
   
   // 실험적 기능
   experimental: {
-    serverActions: true,
     serverComponentsExternalPackages: ['@supabase/supabase-js'],
     optimizePackageImports: ['antd', '@ant-design/icons'],
   },
@@ -107,10 +106,8 @@ const nextConfig = {
   // 번들 분석기 (개발 시에만)
   ...(process.env.ANALYZE === 'true' && {
     webpack: (config) => {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@': './src',
-      }
+      const { BundleAnalyzerPlugin } = require('@next/bundle-analyzer')
+      config.plugins.push(new BundleAnalyzerPlugin())
       return config
     },
   }),
