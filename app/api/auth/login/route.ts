@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, dbHelpers } from '@/lib/supabase';
+import { supabase, supabaseAdmin, dbHelpers } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -15,8 +15,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // supabaseAdmin 확인
+    if (!supabaseAdmin) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+    }
+
     // 사용자 찾기 (모든 역할에서 검색)
-    const { data: users, error } = await supabase
+    const { data: users, error } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('email', email.toLowerCase())
@@ -63,7 +68,7 @@ export async function POST(request: NextRequest) {
     const { password_hash: _, ...userResponse } = user;
 
     // 로그인 성공 로그 기록
-    await supabase
+    await supabaseAdmin
       .from('user_activity_logs')
       .insert({
         user_id: user.id,
@@ -79,8 +84,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Login error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      code: (error as any)?.code,
+      details: (error as any)?.details
+    });
     return NextResponse.json(
-      { error: '서버 오류가 발생했습니다.' },
+      { 
+        error: '서버 오류가 발생했습니다.',
+        debug: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined
+      },
       { status: 500 }
     );
   }
