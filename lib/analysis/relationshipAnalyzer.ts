@@ -365,7 +365,7 @@ export class RelationshipAnalyzer {
       totalClusteringCoeff += neighborConnections / possibleConnections;
     });
     
-    return totalStudents > 0 ? totalClusteringCoeff / students.length : 0;
+    return students.length > 0 ? totalClusteringCoeff / students.length : 0;
   }
 
   /**

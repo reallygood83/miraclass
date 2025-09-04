@@ -226,14 +226,14 @@ export default function SessionDetailPage() {
     {
       title: '응답수',
       key: 'responseCount',
-      render: (_: any, record: Response) => (
+      render: (_: any, record: SurveyResponse) => (
         <Text>{record.responses?.length || 0}개 질문 응답</Text>
       ),
     },
     {
       title: '작업',
       key: 'actions',
-      render: (_: any, record: Response) => (
+      render: (_: any, record: SurveyResponse) => (
         <Button 
           type="link" 
           icon={<EyeOutlined />}

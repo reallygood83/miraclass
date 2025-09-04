@@ -208,10 +208,10 @@ export default function InsightsDisplay({ insights, recommendations, classSummar
                     <div style={{ marginTop: '8px' }}>
                       <Space wrap size={4}>
                         {group.studentIds.slice(0, 6).map((studentId, idx) => (
-                          <Tag key={idx} size="small">{studentId}</Tag>
+                          <Tag key={idx}>{studentId}</Tag>
                         ))}
                         {group.studentIds.length > 6 && (
-                          <Tag size="small">+{group.studentIds.length - 6}명</Tag>
+                          <Tag>+{group.studentIds.length - 6}명</Tag>
                         )}
                       </Space>
                     </div>
@@ -263,7 +263,7 @@ export default function InsightsDisplay({ insights, recommendations, classSummar
                         <Text type="secondary">관련 학생: </Text>
                         <Space wrap>
                           {insight.affectedStudents.map((studentId, idx) => (
-                            <Tag key={idx} size="small" color="blue">
+                            <Tag key={idx} color="blue">
                               {studentId}
                             </Tag>
                           ))}
