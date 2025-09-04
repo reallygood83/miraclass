@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 역할별 추가 검증
-    if (role === 'teacher' && (!school_name || !grade || !class_number)) {
+    if (role === 'teacher' && !school_name) {
       return NextResponse.json(
-        { error: '교사 등록 시 학교명, 학년, 반 정보가 필요합니다.' },
+        { error: '교사 등록 시 학교명이 필요합니다.' },
         { status: 400 }
       );
     }
