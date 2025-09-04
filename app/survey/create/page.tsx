@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Card, 
@@ -14,14 +14,20 @@ import {
   Steps,
   message,
   Divider,
-  Tag
+  Tag,
+  Alert,
+  Tooltip
 } from 'antd';
 import { 
   PlusOutlined, 
   DeleteOutlined, 
   SaveOutlined,
-  ArrowLeftOutlined 
+  ArrowLeftOutlined,
+  RobotOutlined,
+  SettingOutlined,
+  BulbOutlined
 } from '@ant-design/icons';
+import { aiService } from '@/lib/ai-service';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -29,7 +35,7 @@ const { Option } = Select;
 
 interface SurveyQuestion {
   id: string;
-  type: 'friend_selection' | 'collaboration' | 'trust' | 'conflict';
+  type: 'friend_selection' | 'collaboration' | 'trust' | 'conflict' | 'leadership' | 'help';
   title: string;
   description: string;
   maxSelections: number;
@@ -64,7 +70,24 @@ export default function CreateSurveyPage() {
   const [form] = Form.useForm();
   const [questions, setQuestions] = useState<SurveyQuestion[]>(defaultQuestions);
   const [loading, setLoading] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [preferredModel, setPreferredModel] = useState<string>('');
   const router = useRouter();
+
+  // Check AI availability on component mount
+  useEffect(() => {
+    checkAiAvailability();
+  }, []);
+
+  const checkAiAvailability = () => {
+    aiService.refreshSettings();
+    const hasKey = aiService.hasApiKey();
+    const model = aiService.getPreferredModel();
+    
+    setHasApiKey(hasKey);
+    setPreferredModel(model || '');
+  };
 
   const steps = [
     {
@@ -85,6 +108,8 @@ export default function CreateSurveyPage() {
     { value: 'friend_selection', label: '친구 선택', color: '#52c41a' },
     { value: 'collaboration', label: '협력 관계', color: '#1890ff' },
     { value: 'trust', label: '신뢰 관계', color: '#722ed1' },
+    { value: 'leadership', label: '리더십', color: '#faad14' },
+    { value: 'help', label: '도움 관계', color: '#13c2c2' },
     { value: 'conflict', label: '갈등 관계', color: '#f5222d' }
   ];
 
@@ -111,6 +136,45 @@ export default function CreateSurveyPage() {
     setQuestions(questions.map(q => 
       q.id === id ? { ...q, [field]: value } : q
     ));
+  };
+
+  const generateAiQuestions = async () => {
+    if (!hasApiKey) {
+      message.warning('AI 기능을 사용하려면 설정에서 API 키를 먼저 설정해주세요.');
+      return;
+    }
+
+    setAiGenerating(true);
+    
+    try {
+      const formValues = form.getFieldsValue();
+      const className = formValues.targetClass || '6학년 1반';
+      const purpose = formValues.description || '학급 내 관계 분석';
+      
+      message.loading(`${preferredModel.toUpperCase()} AI가 질문을 생성하고 있습니다...`, 0);
+      
+      const generatedQuestions = await aiService.generateSurveyQuestions(
+        className,
+        purpose,
+        28 // 일반적인 학급 규모
+      );
+
+      message.destroy();
+      
+      if (generatedQuestions.length > 0) {
+        setQuestions(generatedQuestions);
+        message.success(`AI가 ${generatedQuestions.length}개의 질문을 생성했습니다!`);
+      } else {
+        message.warning('AI가 질문을 생성하지 못했습니다. 기본 질문을 사용해주세요.');
+      }
+      
+    } catch (error: any) {
+      message.destroy();
+      console.error('AI question generation failed:', error);
+      message.error(error.message || 'AI 질문 생성에 실패했습니다.');
+    } finally {
+      setAiGenerating(false);
+    }
   };
 
   const handleNext = async () => {
@@ -198,15 +262,77 @@ export default function CreateSurveyPage() {
     <Card 
       title="관계 분석 질문들"
       extra={
-        <Button 
-          type="dashed" 
-          icon={<PlusOutlined />}
-          onClick={addQuestion}
-        >
-          질문 추가
-        </Button>
+        <Space size="middle">
+          {hasApiKey ? (
+            <Tooltip title={`${preferredModel?.toUpperCase()} AI로 맞춤 질문 생성`}>
+              <Button 
+                type="primary"
+                icon={<RobotOutlined />}
+                loading={aiGenerating}
+                onClick={generateAiQuestions}
+              >
+                AI 질문 생성
+              </Button>
+            </Tooltip>
+          ) : (
+            <Tooltip title="설정에서 API 키를 먼저 입력해주세요">
+              <Button 
+                icon={<SettingOutlined />}
+                onClick={() => router.push('/settings')}
+              >
+                AI 설정
+              </Button>
+            </Tooltip>
+          )}
+          <Button 
+            type="dashed" 
+            icon={<PlusOutlined />}
+            onClick={addQuestion}
+          >
+            질문 추가
+          </Button>
+        </Space>
       }
     >
+      {/* AI Status Alert */}
+      {hasApiKey ? (
+        <Alert
+          message={
+            <span>
+              <BulbOutlined style={{ marginRight: '8px' }} />
+              <strong>{preferredModel?.toUpperCase()} AI 사용 가능:</strong> 
+              설문 목적에 맞는 맞춤형 질문을 자동으로 생성할 수 있습니다.
+            </span>
+          }
+          type="success"
+          showIcon={false}
+          style={{ marginBottom: '16px' }}
+          action={
+            <Button 
+              size="small" 
+              type="text"
+              icon={<RobotOutlined />}
+              loading={aiGenerating}
+              onClick={generateAiQuestions}
+            >
+              AI 생성
+            </Button>
+          }
+        />
+      ) : (
+        <Alert
+          message="AI 자동 질문 생성 기능을 사용하려면 설정에서 API 키를 입력해주세요."
+          type="warning"
+          showIcon
+          style={{ marginBottom: '16px' }}
+          action={
+            <Button size="small" onClick={() => router.push('/settings')}>
+              설정으로 가기
+            </Button>
+          }
+        />
+      )}
+
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         {questions.map((question, index) => (
           <Card 

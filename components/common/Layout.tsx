@@ -2,8 +2,10 @@ import { ReactNode } from 'react';
 import { Layout as AntLayout, Menu, Button, Typography, Space } from 'antd';
 import { 
   HomeOutlined, 
-  UserOutlined, 
-  TeamOutlined, 
+  FormOutlined, 
+  ShareAltOutlined, 
+  BarChartOutlined,
+  EyeOutlined,
   SettingOutlined,
   LogoutOutlined,
   MenuOutlined
@@ -30,16 +32,26 @@ export default function Layout({ children, user }: LayoutProps) {
     },
     {
       key: '2',
-      icon: <UserOutlined />,
-      label: <Link href="/profile">프로필</Link>,
+      icon: <FormOutlined />,
+      label: <Link href="/surveys">설문 관리</Link>,
     },
     {
       key: '3',
-      icon: <TeamOutlined />,
-      label: <Link href="/classes">수업</Link>,
+      icon: <ShareAltOutlined />,
+      label: <Link href="/network">관계 네트워크</Link>,
     },
     {
       key: '4',
+      icon: <BarChartOutlined />,
+      label: <Link href="/analytics">AI 분석</Link>,
+    },
+    {
+      key: '5',
+      icon: <EyeOutlined />,
+      label: <Link href="/monitoring">실시간 모니터링</Link>,
+    },
+    {
+      key: '6',
       icon: <SettingOutlined />,
       label: <Link href="/settings">설정</Link>,
     },
@@ -63,7 +75,7 @@ export default function Layout({ children, user }: LayoutProps) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-            <Link href="/">MiraClass</Link>
+            <Link href="/">우리반 커넥트</Link>
           </Title>
         </div>
         
