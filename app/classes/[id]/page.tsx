@@ -54,6 +54,8 @@ interface LocalStudent {
   name: string;
   student_number: number;
   class_id: string;
+  user_id?: string; // 로그인용 ID
+  password?: string; // 임시 비밀번호
   connections: number;
   risk_level: 'high' | 'medium' | 'low';
   last_survey: string;
@@ -86,8 +88,11 @@ export default function ClassDetailPage() {
   const [isClient, setIsClient] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAddStudentModalVisible, setIsAddStudentModalVisible] = useState(false);
+  const [isEditStudentModalVisible, setIsEditStudentModalVisible] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<LocalStudent | null>(null);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const router = useRouter();
   const params = useParams();
   const classId = params?.id as string;
@@ -111,7 +116,7 @@ export default function ClassDetailPage() {
   const initializeUserAndClass = async () => {
     try {
       // Supabase 연결 테스트
-      const { data: testData, error: testError } = await supabase.from('users').select('count').limit(1);
+      const { error: testError } = await supabase.from('users').select('count').limit(1);
       
       if (!testError) {
         setIsSupabaseConnected(true);
@@ -231,26 +236,31 @@ export default function ClassDetailPage() {
     const dummyStudents: LocalStudent[] = [
       {
         id: '1', name: '김민수', student_number: 1, class_id: classId,
+        user_id: 'student001', password: 'temp1234',
         connections: 8, risk_level: 'low', last_survey: '1일 전', 
         status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
       },
       {
         id: '2', name: '이서연', student_number: 2, class_id: classId,
+        user_id: 'student002', password: 'temp1234',
         connections: 6, risk_level: 'medium', last_survey: '1일 전',
         status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
       },
       {
         id: '3', name: '박지원', student_number: 3, class_id: classId,
+        user_id: 'student003', password: 'temp1234',
         connections: 12, risk_level: 'low', last_survey: '1일 전',
         status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
       },
       {
         id: '4', name: '정현우', student_number: 4, class_id: classId,
+        user_id: 'student004', password: 'temp1234',
         connections: 4, risk_level: 'medium', last_survey: '2일 전',
         status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
       },
       {
         id: '5', name: '이채원', student_number: 5, class_id: classId,
+        user_id: 'student005', password: 'temp1234',
         connections: 1, risk_level: 'high', last_survey: '3일 전',
         status: 'active', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-01-15T00:00:00Z'
       }
@@ -258,6 +268,13 @@ export default function ClassDetailPage() {
 
     setClassData(dummyClass);
     setStudents(dummyStudents);
+  };
+
+  // ID/비밀번호 자동 생성 함수
+  const generateStudentCredentials = (studentNumber: number) => {
+    const userId = `student${String(studentNumber).padStart(3, '0')}`;
+    const password = Math.random().toString(36).slice(-8);
+    return { userId, password };
   };
 
   const handleAddStudent = async () => {
@@ -269,10 +286,15 @@ export default function ClassDetailPage() {
         return;
       }
       
+      // ID/비밀번호 자동 생성
+      const { userId, password } = generateStudentCredentials(values.student_number);
+      
       const newStudentData = {
         name: values.name,
         student_number: values.student_number,
         class_id: classData.id,
+        user_id: userId,
+        password: password,
         connections: 0,
         risk_level: 'low' as const,
         last_survey: null,
@@ -280,7 +302,7 @@ export default function ClassDetailPage() {
       };
       
       if (isSupabaseConnected) {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('students')
           .insert([newStudentData])
           .select()
@@ -300,7 +322,7 @@ export default function ClassDetailPage() {
           .order('student_number', { ascending: true });
         setStudents(updatedStudents || []);
         
-        message.success('학생이 추가되었습니다.');
+        message.success(`학생이 추가되었습니다. ID: ${userId}, 비밀번호: ${password}`);
       } else {
         // 더미 모드
         const newStudent: LocalStudent = {
@@ -312,7 +334,7 @@ export default function ClassDetailPage() {
         };
 
         setStudents([...students, newStudent]);
-        message.success('학생이 추가되었습니다.');
+        message.success(`학생이 추가되었습니다. ID: ${userId}, 비밀번호: ${password}`);
       }
       
       setIsAddStudentModalVisible(false);
@@ -320,6 +342,112 @@ export default function ClassDetailPage() {
     } catch (error) {
       console.error('학생 추가 오류:', error);
       message.error('학생 추가 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 학생 편집 함수
+  const handleEditStudent = (student: LocalStudent) => {
+    setEditingStudent(student);
+    editForm.setFieldsValue({
+      name: student.name,
+      student_number: student.student_number,
+      user_id: student.user_id,
+      password: student.password
+    });
+    setIsEditStudentModalVisible(true);
+  };
+
+  const handleSaveEditStudent = async () => {
+    try {
+      const values = await editForm.validateFields();
+      
+      if (!editingStudent) {
+        message.error('편집할 학생 정보가 없습니다.');
+        return;
+      }
+      
+      const updateData = {
+        name: values.name,
+        student_number: values.student_number,
+        user_id: values.user_id,
+        password: values.password,
+        updated_at: new Date().toISOString()
+      };
+      
+      if (isSupabaseConnected) {
+        const { error } = await supabase
+          .from('students')
+          .update(updateData)
+          .eq('id', editingStudent.id);
+        
+        if (error) {
+          console.error('Supabase 학생 수정 오류:', error);
+          message.error('학생 정보 수정에 실패했습니다.');
+          return;
+        }
+        
+        // 학생 목록 새로고침
+        const { data: updatedStudents } = await supabase
+          .from('students')
+          .select('*')
+          .eq('class_id', classData?.id)
+          .order('student_number', { ascending: true });
+        setStudents(updatedStudents || []);
+        
+        message.success('학생 정보가 수정되었습니다.');
+      } else {
+        // 더미 모드
+        const updatedStudents = students.map(s => 
+          s.id === editingStudent.id 
+            ? { ...s, ...updateData }
+            : s
+        );
+        setStudents(updatedStudents);
+        message.success('학생 정보가 수정되었습니다.');
+      }
+      
+      setIsEditStudentModalVisible(false);
+      setEditingStudent(null);
+      editForm.resetFields();
+    } catch (error) {
+      console.error('학생 수정 오류:', error);
+      message.error('학생 정보 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 학생 삭제 함수
+  const handleDeleteStudent = async (studentId: string) => {
+    try {
+      if (isSupabaseConnected) {
+        const { error } = await supabase
+          .from('students')
+          .delete()
+          .eq('id', studentId);
+        
+        if (error) {
+          console.error('Supabase 학생 삭제 오류:', error);
+          message.error('학생 삭제에 실패했습니다.');
+          return;
+        }
+        
+        // 학생 목록 새로고침
+        const { data: updatedStudents } = await supabase
+          .from('students')
+          .select('*')
+          .eq('class_id', classData?.id)
+          .order('student_number', { ascending: true });
+        setStudents(updatedStudents || []);
+        
+        message.success('학생이 삭제되었습니다.');
+      } else {
+        // 더미 모드
+        const updatedStudents = students.filter(s => s.id !== studentId);
+        setStudents(updatedStudents);
+        message.success('학생이 삭제되었습니다.');
+      }
+    } catch (error) {
+      console.error('학생 삭제 오류:', error);
+      message.error('학생 삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -347,6 +475,18 @@ export default function ClassDetailPage() {
               {record.student_number}번
             </Text>
           </div>
+        </div>
+      )
+    },
+    {
+      title: '계정 정보',
+      key: 'account_info',
+      render: (_: any, record: LocalStudent) => (
+        <div>
+          <div style={{ fontWeight: 'bold', color: '#1890ff' }}>ID: {record.user_id}</div>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            PW: {record.password}
+          </Text>
         </div>
       )
     },
@@ -392,13 +532,22 @@ export default function ClassDetailPage() {
           <Button 
             type="text" 
             icon={<EditOutlined />}
-            onClick={() => message.info('학생 편집 기능 준비 중입니다.')}
+            onClick={() => handleEditStudent(record)}
           />
           <Button 
             type="text" 
             danger
             icon={<DeleteOutlined />}
-            onClick={() => message.info('학생 삭제 기능 준비 중입니다.')}
+            onClick={() => {
+              Modal.confirm({
+                title: '학생 삭제',
+                content: `${record.name} 학생을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`,
+                okText: '삭제',
+                cancelText: '취소',
+                okType: 'danger',
+                onOk: () => handleDeleteStudent(record.id)
+              });
+            }}
           />
         </Space>
       )
@@ -680,6 +829,67 @@ export default function ClassDetailPage() {
             >
               <Input type="number" placeholder="출석 번호" />
             </Form.Item>
+            
+            <div style={{ marginTop: '16px', padding: '12px', background: '#f0f2f5', borderRadius: '6px' }}>
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                💡 학생 추가 시 로그인용 ID와 임시 비밀번호가 자동으로 생성됩니다.
+              </Text>
+            </div>
+          </Form>
+        </Modal>
+
+        {/* 학생 편집 모달 */}
+        <Modal
+          title="학생 정보 수정"
+          open={isEditStudentModalVisible}
+          onOk={handleSaveEditStudent}
+          onCancel={() => {
+            setIsEditStudentModalVisible(false);
+            setEditingStudent(null);
+            editForm.resetFields();
+          }}
+          width={500}
+        >
+          <Form
+            form={editForm}
+            layout="vertical"
+          >
+            <Form.Item
+              name="name"
+              label="학생 이름"
+              rules={[{ required: true, message: '학생 이름을 입력해주세요!' }]}
+            >
+              <Input placeholder="학생 이름" />
+            </Form.Item>
+
+            <Form.Item
+              name="student_number"
+              label="출석 번호"
+              rules={[{ required: true, message: '출석 번호를 입력해주세요!' }]}
+            >
+              <Input type="number" placeholder="출석 번호" />
+            </Form.Item>
+            
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="user_id"
+                  label="로그인 ID"
+                  rules={[{ required: true, message: '로그인 ID를 입력해주세요!' }]}
+                >
+                  <Input placeholder="로그인 ID" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="password"
+                  label="비밀번호"
+                  rules={[{ required: true, message: '비밀번호를 입력해주세요!' }]}
+                >
+                  <Input placeholder="비밀번호" />
+                </Form.Item>
+              </Col>
+            </Row>
           </Form>
         </Modal>
       </div>
