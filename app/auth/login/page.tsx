@@ -54,7 +54,9 @@ export default function LoginPage() {
         console.log('👤 User info from token:', userInfo);
         
         console.log('🔄 Redirecting to dashboard...');
-        router.push('/dashboard');
+        
+        // 강제 새로고침으로 리다이렉트
+        window.location.href = '/dashboard';
       } else {
         console.error('❌ Login failed:', data.error);
         setError(data.error || '로그인에 실패했습니다.');

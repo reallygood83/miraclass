@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       {
         id: user.id,
         email: user.email,
-        name: user.name,
+        name: Buffer.from(user.name, 'utf8').toString('utf8'), // 한국어 인코딩 수정
         role: user.role,
         school_id: user.school_id
       },
