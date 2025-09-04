@@ -20,6 +20,9 @@ export interface User {
   name: string;
   role: 'teacher' | 'student' | 'admin';
   school_name?: string;
+  class_id?: string; // 학생의 소속 학급 ID
+  grade?: number; // 학생의 학년
+  class_number?: number; // 학생의 반 번호
   created_at: string;
   updated_at: string;
 }
@@ -31,6 +34,7 @@ export interface Class {
   class_number: number;
   teacher_id: string;
   teacher_name: string;
+  class_code: string; // 학급 고유 코드 (예: ABC123)
   student_count: number;
   total_surveys: number;
   active_surveys: number;
