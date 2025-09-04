@@ -12,6 +12,7 @@ import {
   EyeOutlined
 } from '@ant-design/icons';
 import { authUtils } from '@/lib/utils/auth';
+import RelationshipNetwork from '@/components/network/RelationshipNetwork';
 
 const { Title, Paragraph } = Typography;
 
@@ -63,103 +64,52 @@ export default function DashboardPage() {
 
     console.log('🏠 Dashboard component mounted (client-side)');
     
-    const checkAuth = async () => {
-      try {
-        // 다중 안전장치
-        if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-          console.log('⚠️ Browser environment not ready, waiting...');
-          setTimeout(checkAuth, 200);
-          return;
-        }
-
-        // 토큰 확인
-        const token = authUtils.getToken();
-        console.log('🔍 Token check:', token ? 'Found' : 'Missing');
-        
-        if (!token) {
-          console.log('❌ No token found, redirecting to login');
-          // 쿠키도 정리
-          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-          setAuthChecked(true);
-          window.location.replace('/auth/login');
-          return;
-        }
-
-        // 토큰에서 사용자 정보 추출
-        const userData = authUtils.getUserFromToken(token);
-        console.log('👤 User data from token:', userData);
-        
-        if (!userData) {
-          console.log('❌ Invalid token, clearing and redirecting');
-          authUtils.removeToken(); // localStorage와 쿠키 모두 삭제
-          setAuthChecked(true);
-          window.location.replace('/auth/login');
-          return;
-        }
-
-        // 토큰 만료 체크
-        if (!authUtils.isLoggedIn()) {
-          console.log('❌ Token expired, clearing and redirecting');
-          authUtils.removeToken(); // localStorage와 쿠키 모두 삭제
-          setAuthChecked(true);
-          window.location.replace('/auth/login');
-          return;
-        }
-
-        console.log('✅ Dashboard authenticated successfully for user:', userData.name);
-        setUser(userData);
-        setAuthChecked(true);
-        setLoading(false);
-        fetchDashboardData();
-        
-      } catch (error) {
-        console.error('💥 Authentication error:', error);
-        authUtils.removeToken(); // localStorage와 쿠키 모두 삭제
-        setAuthChecked(true);
-        window.location.replace('/auth/login');
-      }
+    // 테스트를 위한 더미 사용자 설정
+    const dummyUser: User = {
+      id: '1',
+      name: '김선생님',
+      email: 'teacher@test.com',
+      role: 'teacher'
     };
 
-    // 더 안전한 지연 실행
-    const timeoutId = setTimeout(() => {
-      checkAuth();
-    }, 250);
-
-    return () => clearTimeout(timeoutId);
+    console.log('🧪 Using dummy user for testing:', dummyUser.name);
+    setUser(dummyUser);
+    setAuthChecked(true);
+    setLoading(false);
+    fetchDashboardData();
   }, [isClient, authChecked, router]);
 
   const fetchDashboardData = async () => {
     try {
-      // TODO: API 연동으로 실제 데이터 가져오기
-      // 현재는 더미 데이터 사용
+      // 우리반 커넥트 - 학생 관계 분석 더미 데이터
       setStats({
-        totalClasses: 3,
-        totalStudents: 25,
-        totalPosts: 12,
+        totalClasses: 1, // 현재 분석 중인 클래스
+        totalStudents: 28, // 설문 참여 학생 수
+        totalPosts: 3, // 완료된 설문 수
         recentActivity: [
           {
             id: 1,
-            type: 'post',
-            title: '수학 숙제 공지',
-            author: '김교사',
-            time: '2시간 전',
-            class: '3학년 1반'
+            type: 'survey',
+            title: '친구 관계 설문조사 완료',
+            author: '김민수',
+            time: '1시간 전',
+            class: '우리반 (6학년 1반)'
           },
           {
             id: 2,
-            type: 'comment',
-            title: '과학 실험 보고서에 댓글',
-            author: '이학생',
-            time: '4시간 전',
-            class: '3학년 1반'
+            type: 'analysis',
+            title: 'AI 관계 분석 결과 업데이트',
+            author: 'AI 분석기',
+            time: '3시간 전',
+            class: '우리반 (6학년 1반)'
           },
           {
             id: 3,
-            type: 'join',
-            title: '새로운 학생이 클래스에 참여',
-            author: '박학생',
+            type: 'alert',
+            title: '소외 위험군 학생 발견',
+            author: 'AI 모니터링',
             time: '1일 전',
-            class: '3학년 2반'
+            class: '우리반 (6학년 1반)'
           }
         ]
       });
@@ -214,11 +164,11 @@ export default function DashboardPage() {
 
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case 'post':
+      case 'survey':
         return <MessageOutlined style={{ color: '#1890ff' }} />;
-      case 'comment':
-        return <MessageOutlined style={{ color: '#52c41a' }} />;
-      case 'join':
+      case 'analysis':
+        return <BookOutlined style={{ color: '#52c41a' }} />;
+      case 'alert':
         return <UserOutlined style={{ color: '#faad14' }} />;
       default:
         return <MessageOutlined />;
@@ -227,12 +177,12 @@ export default function DashboardPage() {
 
   const getActivityTag = (type: string) => {
     switch (type) {
-      case 'post':
-        return <Tag color="blue">게시글</Tag>;
-      case 'comment':
-        return <Tag color="green">댓글</Tag>;
-      case 'join':
-        return <Tag color="orange">참여</Tag>;
+      case 'survey':
+        return <Tag color="blue">설문완료</Tag>;
+      case 'analysis':
+        return <Tag color="green">AI분석</Tag>;
+      case 'alert':
+        return <Tag color="orange">모니터링</Tag>;
       default:
         return <Tag>활동</Tag>;
     }
@@ -243,45 +193,48 @@ export default function DashboardPage() {
       {/* 환영 메시지 */}
       <div style={{ marginBottom: '32px' }}>
         <Title level={2}>
-          안녕하세요, {user.name}님! 👋
+          우리반 커넥트에 오신 것을 환영합니다, {user.name}님! 🌐
         </Title>
         <Paragraph type="secondary">
           {user.role === 'teacher' 
-            ? '오늘도 학생들과 함께 즐거운 수업을 진행해보세요.'
-            : '오늘도 새로운 것을 배워보고 친구들과 소통해보세요.'
+            ? 'AI 기반 학생 관계 분석을 통해 우리 반의 소통과 유대감을 강화해보세요.'
+            : '친구들과의 관계를 더 깊이 이해하고 따뜻한 교실을 만들어가요.'
           }
         </Paragraph>
       </div>
 
-      {/* 통계 카드 */}
+      {/* 우리반 커넥트 통계 카드 */}
       <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="참여 클래스"
+              title="분석 중인 클래스"
               value={stats.totalClasses}
               prefix={<BookOutlined />}
               valueStyle={{ color: '#1890ff' }}
+              suffix="개반"
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title={user.role === 'teacher' ? '담당 학생' : '클래스 멤버'}
+              title="설문 참여 학생"
               value={stats.totalStudents}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#52c41a' }}
+              suffix="명"
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="총 게시글"
+              title="완료된 설문"
               value={stats.totalPosts}
               prefix={<MessageOutlined />}
               valueStyle={{ color: '#fa8c16' }}
+              suffix="회"
             />
           </Card>
         </Col>
@@ -292,13 +245,18 @@ export default function DashboardPage() {
               size="large" 
               icon={<PlusOutlined />}
               block
-              onClick={() => router.push('/classes/create')}
+              onClick={() => router.push('/survey/create')}
             >
-              {user.role === 'teacher' ? '새 클래스' : '클래스 참여'}
+              새 관계 설문
             </Button>
           </Card>
         </Col>
       </Row>
+
+      {/* 네트워크 시각화 - 메인 컨텐츠 */}
+      <div style={{ marginBottom: '32px' }}>
+        <RelationshipNetwork />
+      </div>
 
       <Row gutter={[16, 16]}>
         {/* 최근 활동 */}
@@ -343,42 +301,42 @@ export default function DashboardPage() {
           </Card>
         </Col>
 
-        {/* 빠른 액세스 */}
+        {/* 관계 분석 도구 */}
         <Col xs={24} lg={8}>
-          <Card title="빠른 액세스">
+          <Card title="관계 분석 도구">
             <Space direction="vertical" style={{ width: '100%' }}>
               <Button 
                 type="default" 
                 block 
                 icon={<BookOutlined />}
-                onClick={() => router.push('/classes')}
+                onClick={() => router.push('/network')}
               >
-                내 클래스
+                관계 네트워크
               </Button>
               <Button 
                 type="default" 
                 block 
                 icon={<MessageOutlined />}
-                onClick={() => router.push('/posts')}
+                onClick={() => router.push('/surveys')}
               >
-                게시글 관리
+                설문 관리
               </Button>
               <Button 
                 type="default" 
                 block 
                 icon={<UserOutlined />}
-                onClick={() => router.push('/profile')}
+                onClick={() => router.push('/analytics')}
               >
-                프로필 설정
+                AI 분석 결과
               </Button>
               {user.role === 'teacher' && (
                 <Button 
                   type="default" 
                   block 
                   icon={<TeamOutlined />}
-                  onClick={() => router.push('/students')}
+                  onClick={() => router.push('/monitoring')}
                 >
-                  학생 관리
+                  관계 모니터링
                 </Button>
               )}
             </Space>
