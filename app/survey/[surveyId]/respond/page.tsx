@@ -166,7 +166,7 @@ export default function SurveyResponsePage() {
       setSurvey(currentSurvey);
       
       // 응답 배열 초기화
-      const initialResponses: Response[] = currentSurvey.questions.map(q => ({
+      const initialResponses: Response[] = currentSurvey.questions.map((q: SurveyQuestion) => ({
         questionId: q.id,
         selectedStudents: []
       }));
