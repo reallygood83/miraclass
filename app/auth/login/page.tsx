@@ -17,6 +17,7 @@ interface LoginForm {
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const router = useRouter();
 
   const onFinish = async (values: LoginForm) => {
@@ -53,11 +54,30 @@ export default function LoginPage() {
         const userInfo = authUtils.getUserFromToken();
         console.log('👤 User info from token:', userInfo);
         
-        console.log('🔄 Redirecting to dashboard...');
+        console.log('🔄 Setting login success state...');
+        setLoginSuccess(true);
         
-        // 즉시 리다이렉트 (강제)
-        console.log('🚀 Executing immediate redirect to dashboard');
-        window.location.replace('/dashboard');
+        // 다중 리다이렉트 시도
+        console.log('🚀 Attempting multiple redirect methods');
+        
+        // 방법 1: window.location.href
+        setTimeout(() => {
+          console.log('🔄 Method 1: window.location.href');
+          window.location.href = '/dashboard';
+        }, 100);
+        
+        // 방법 2: window.location.replace (백업)
+        setTimeout(() => {
+          console.log('🔄 Method 2: window.location.replace');  
+          window.location.replace('/dashboard');
+        }, 200);
+        
+        // 방법 3: Next.js router (백업)
+        setTimeout(() => {
+          console.log('🔄 Method 3: router.replace');
+          router.replace('/dashboard');
+        }, 300);
+        
       } else {
         console.error('❌ Login failed:', data.error);
         setError(data.error || '로그인에 실패했습니다.');
@@ -70,6 +90,31 @@ export default function LoginPage() {
       console.log('🏁 Login process completed');
     }
   };
+
+  // 로그인 성공 시 로딩 화면 표시
+  if (loginSuccess) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <Card style={{ width: 400, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', textAlign: 'center' }}>
+          <div style={{ padding: '40px 20px' }}>
+            <Title level={3}>🎉 로그인 성공!</Title>
+            <Paragraph>대시보드로 이동 중입니다...</Paragraph>
+            <div style={{ marginTop: 20 }}>
+              <Button type="primary" loading>
+                잠시만 기다려주세요
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div style={{ 
