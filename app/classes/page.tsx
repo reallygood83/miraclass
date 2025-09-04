@@ -33,42 +33,47 @@ import {
   EyeOutlined
 } from '@ant-design/icons';
 import Layout from '@/components/common/Layout';
-import { supabase, db, type User, type Class } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 
-interface User {
+interface LocalUser {
   id: string;
   name: string;
   email: string;
   role: 'teacher' | 'student';
   school_id?: string;
+  school_name?: string;
   grade?: number;
   class_number?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
-interface Class {
+interface LocalClass {
   id: string;
   name: string;
   grade: number;
   class_number: number;
+  teacher_id: string;
   teacher_name: string;
   student_count: number;
   total_surveys: number;
   active_surveys: number;
-  last_analysis: string;
+  last_analysis: string | null;
   status: 'active' | 'inactive';
   created_at: string;
+  updated_at: string;
 }
 
 export default function ClassesPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [classes, setClasses] = useState<Class[]>([]);
+  const [user, setUser] = useState<LocalUser | null>(null);
+  const [classes, setClasses] = useState<LocalClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [editingClass, setEditingClass] = useState<LocalClass | null>(null);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [form] = Form.useForm();
   const router = useRouter();
@@ -98,14 +103,18 @@ export default function ClassesPage() {
       if (!testError) {
         setIsSupabaseConnected(true);
         // 실제 사용자 조회 (테스트용으로 첫 번째 teacher 사용)
-        const { data: userData, error: userError } = await db.getUserByEmail('teacher@test.com');
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', 'teacher@test.com')
+          .single();
         
         if (userData && !userError) {
           setUser(userData);
           loadClasses(userData.id);
         } else {
           // 사용자가 없으면 더미 사용자로 대체
-          const dummyUser: User = {
+          const dummyUser: LocalUser = {
             id: '550e8400-e29b-41d4-a716-446655440000',
             name: '김선생',
             email: 'teacher@test.com',
@@ -121,7 +130,7 @@ export default function ClassesPage() {
         // Supabase 연결 실패 시 더미 모드
         console.warn('Supabase 연결 실패, 더미 데이터 모드로 진행:', testError);
         setIsSupabaseConnected(false);
-        const dummyUser: User = {
+        const dummyUser: LocalUser = {
           id: '1',
           name: '김선생',
           email: 'teacher@test.com',
@@ -147,7 +156,11 @@ export default function ClassesPage() {
     try {
       if (isSupabaseConnected) {
         // Supabase에서 데이터 로드
-        const { data, error } = await db.getClasses(teacherId);
+        const { data, error } = await supabase
+          .from('classes')
+          .select('*')
+          .eq('teacher_id', teacherId)
+          .order('created_at', { ascending: false });
         
         if (error) {
           console.error('Supabase 데이터 로드 오류:', error);
@@ -175,7 +188,7 @@ export default function ClassesPage() {
     const storedClasses = localStorage.getItem('classes');
     const parsedClasses = storedClasses ? JSON.parse(storedClasses) : [];
     
-    const dummyClasses: Class[] = [
+    const dummyClasses: LocalClass[] = [
       {
         id: '1',
         name: '6학년 1반',
@@ -218,7 +231,7 @@ export default function ClassesPage() {
     setIsModalVisible(true);
   };
 
-  const handleEditClass = (classItem: Class) => {
+  const handleEditClass = (classItem: LocalClass) => {
     setEditingClass(classItem);
     form.setFieldsValue(classItem);
     setIsModalVisible(true);
@@ -228,7 +241,10 @@ export default function ClassesPage() {
     try {
       if (isSupabaseConnected) {
         // Supabase에서 삭제
-        const { error } = await db.deleteClass(classId);
+        const { error } = await supabase
+          .from('classes')
+          .delete()
+          .eq('id', classId);
         
         if (error) {
           message.error('학급 삭제에 실패했습니다.');
@@ -276,7 +292,12 @@ export default function ClassesPage() {
         };
         
         if (isSupabaseConnected) {
-          const { data, error } = await db.updateClass(editingClass.id, updateData);
+          const { data, error } = await supabase
+            .from('classes')
+            .update({ ...updateData, updated_at: new Date().toISOString() })
+            .eq('id', editingClass.id)
+            .select()
+            .single();
           
           if (error) {
             message.error('학급 수정에 실패했습니다.');
@@ -311,7 +332,11 @@ export default function ClassesPage() {
         };
         
         if (isSupabaseConnected) {
-          const { data, error } = await db.createClass(newClassData);
+          const { data, error } = await supabase
+            .from('classes')
+            .insert([newClassData])
+            .select()
+            .single();
           
           if (error) {
             console.error('학급 생성 오류:', error);
@@ -323,7 +348,7 @@ export default function ClassesPage() {
           loadClasses(user.id);
         } else {
           // 더미 모드
-          const newClass: Class = {
+          const newClass: LocalClass = {
             id: Date.now().toString(),
             ...newClassData,
             created_at: new Date().toISOString(),
@@ -371,7 +396,7 @@ export default function ClassesPage() {
       dataIndex: 'name',
       key: 'name',
       width: 150,
-      render: (text: string, record: Class) => (
+      render: (text: string, record: LocalClass) => (
         <div>
           <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{text}</div>
           <Text type="secondary" style={{ fontSize: '12px' }}>
@@ -396,7 +421,7 @@ export default function ClassesPage() {
       title: '설문 현황',
       key: 'surveys',
       width: 120,
-      render: (_: any, record: Class) => (
+      render: (_: any, record: LocalClass) => (
         <div>
           <div>전체: {record.total_surveys}회</div>
           <div style={{ fontSize: '12px', color: '#52c41a' }}>
@@ -418,7 +443,7 @@ export default function ClassesPage() {
       key: 'last_analysis',
       width: 120,
       render: (text: string) => (
-        <Text type={text === '아직 없음' ? 'secondary' : 'default'}>
+        <Text type={text === '아직 없음' ? 'secondary' : undefined}>
           {text}
         </Text>
       )
@@ -434,7 +459,7 @@ export default function ClassesPage() {
       title: '작업',
       key: 'actions',
       width: 180,
-      render: (_: any, record: Class) => (
+      render: (_: any, record: LocalClass) => (
         <Space size="small">
           <Tooltip title="학급 상세">
             <Button 
@@ -519,7 +544,7 @@ export default function ClassesPage() {
   const totalSurveys = classes.reduce((sum, c) => sum + c.total_surveys, 0);
 
   return (
-    <Layout user={{ name: user.name, role: user.role }}>
+    <Layout>
       <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

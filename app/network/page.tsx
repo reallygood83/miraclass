@@ -30,7 +30,7 @@ import {
 } from '@ant-design/icons';
 import RelationshipNetwork from '@/components/network/RelationshipNetwork';
 import Layout from '@/components/common/Layout';
-import { supabase, db } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -64,6 +64,7 @@ export default function NetworkAnalysisPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [connectionLoading, setConnectionLoading] = useState(true);
+  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
   const router = useRouter();
 
   // 클라이언트 사이드임을 확인
@@ -96,7 +97,68 @@ export default function NetworkAnalysisPage() {
     if (authChecked) {
       initializeConnection();
     }
+
+    // 컴포넌트 언마운트 시 구독 정리
+    return () => {
+      if (realtimeChannel) {
+        console.log('🔄 네트워크 분석 실시간 구독 정리 중...');
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
   }, [selectedClass, authChecked]);
+
+  // realtimeChannel 변경 시에도 정리
+  useEffect(() => {
+    return () => {
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
+  }, [realtimeChannel]);
+
+  const setupRealtimeSubscription = () => {
+    if (!isSupabaseConnected) return;
+
+    const channel = supabase
+      .channel('network_analysis_channel')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'network_analysis'
+      }, (payload) => {
+        console.log('📊 새로운 네트워크 분석 데이터:', payload);
+        // 새로운 분석 결과가 현재 선택된 클래스의 것인지 확인
+        loadNetworkAnalysisFromSupabase();
+        setNetworkKey(prev => prev + 1); // 네트워크 시각화 새로고침
+        message.success('📊 네트워크 분석이 업데이트되었습니다!');
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'network_analysis'
+      }, (payload) => {
+        console.log('🔄 네트워크 분석 업데이트:', payload);
+        loadNetworkAnalysisFromSupabase();
+        setNetworkKey(prev => prev + 1); // 네트워크 시각화 새로고침
+        message.info('📈 네트워크 분석 결과가 갱신되었습니다.');
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'survey_responses'
+      }, (payload) => {
+        console.log('📝 새로운 설문 응답으로 인한 관계 변화 감지');
+        // 설문 응답이 있을 때마다 네트워크 분석 데이터 갱신 가능성
+        message.info('새로운 설문 응답으로 관계 분석이 업데이트될 수 있습니다.');
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ 네트워크 분석 실시간 구독 시작됨');
+        }
+      });
+
+    setRealtimeChannel(channel);
+  };
 
   const initializeConnection = async () => {
     setConnectionLoading(true);
@@ -110,6 +172,7 @@ export default function NetworkAnalysisPage() {
       if (!testError) {
         setIsSupabaseConnected(true);
         await loadNetworkAnalysisFromSupabase();
+        setupRealtimeSubscription();
       } else {
         console.warn('Supabase 연결 실패, 더미 모드로 전환:', testError.message);
         setIsSupabaseConnected(false);
@@ -129,7 +192,11 @@ export default function NetworkAnalysisPage() {
     
     try {
       // 선택된 클래스 정보 가져오기
-      const { data: classesData } = await db.getClasses('550e8400-e29b-41d4-a716-446655440000');
+      const { data: classesData } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('teacher_id', '550e8400-e29b-41d4-a716-446655440000')
+        .order('created_at', { ascending: false });
       const selectedClassData = classesData?.find(c => c.name === selectedClass);
       
       if (selectedClassData) {
@@ -244,7 +311,7 @@ export default function NetworkAnalysisPage() {
   }
 
   return (
-    <Layout user={{ name: user.name, role: user.role }}>
+    <Layout>
       <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* 헤더 */}
       <div style={{ marginBottom: '24px' }}>

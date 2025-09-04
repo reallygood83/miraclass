@@ -3,7 +3,6 @@ docker-backup/
 docker-compose*.yml
 Dockerfile*
 scripts/
-monitoring/
 
 # 데이터베이스 관련
 database/

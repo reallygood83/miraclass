@@ -31,7 +31,7 @@ import {
   DisconnectOutlined
 } from '@ant-design/icons';
 import Layout from '@/components/common/Layout';
-import { supabase, db, Survey } from '@/lib/supabase';
+import { supabase, Survey } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 
@@ -42,11 +42,79 @@ export default function SurveysPage() {
   const [loading, setLoading] = useState(true);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [connectionLoading, setConnectionLoading] = useState(true);
+  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
     initializeConnection();
+
+    // 컴포넌트 언마운트 시 구독 정리
+    return () => {
+      if (realtimeChannel) {
+        console.log('🔄 설문 실시간 구독 정리 중...');
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
   }, []);
+
+  // realtimeChannel 변경 시에도 정리
+  useEffect(() => {
+    return () => {
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
+  }, [realtimeChannel]);
+
+  const setupRealtimeSubscription = () => {
+    if (!isSupabaseConnected) return;
+
+    const channel = supabase
+      .channel('survey_responses_channel')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'survey_responses'
+      }, (payload) => {
+        console.log('🔔 새로운 설문 응답:', payload);
+        // 설문 응답 수 업데이트
+        setSurveys(prevSurveys => 
+          prevSurveys.map(survey => 
+            survey.id === payload.new.survey_id 
+              ? { ...survey, responses_count: survey.responses_count + 1 }
+              : survey
+          )
+        );
+        message.success('📝 새로운 설문 응답이 제출되었습니다!');
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'surveys'
+      }, (payload) => {
+        console.log('🔄 설문 업데이트:', payload);
+        // 설문 정보 업데이트
+        setSurveys(prevSurveys =>
+          prevSurveys.map(survey =>
+            survey.id === payload.new.id
+              ? { 
+                  ...survey, 
+                  status: payload.new.status,
+                  responses_count: payload.new.responses_count || survey.responses_count
+                }
+              : survey
+          )
+        );
+        message.info(`📊 설문 "${payload.new.title}"이 업데이트되었습니다.`);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ 설문 실시간 구독 시작됨');
+        }
+      });
+
+    setRealtimeChannel(channel);
+  };
 
   const initializeConnection = async () => {
     setConnectionLoading(true);
@@ -60,6 +128,7 @@ export default function SurveysPage() {
       if (!testError) {
         setIsSupabaseConnected(true);
         await loadSurveysFromSupabase();
+        setupRealtimeSubscription();
       } else {
         console.warn('Supabase 연결 실패, 더미 모드로 전환:', testError.message);
         setIsSupabaseConnected(false);
@@ -77,13 +146,21 @@ export default function SurveysPage() {
   const loadSurveysFromSupabase = async () => {
     setLoading(true);
     try {
-      const { data: classesData } = await db.getClasses('550e8400-e29b-41d4-a716-446655440000');
+      const { data: classesData } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('teacher_id', '550e8400-e29b-41d4-a716-446655440000')
+        .order('created_at', { ascending: false });
       
       if (classesData && classesData.length > 0) {
         const allSurveys: Survey[] = [];
         
         for (const classItem of classesData) {
-          const { data: surveysData } = await db.getSurveys(classItem.id);
+          const { data: surveysData } = await supabase
+            .from('surveys')
+            .select('*')
+            .eq('class_id', classItem.id)
+            .order('created_at', { ascending: false });
           if (surveysData) {
             // Supabase 데이터를 Survey 인터페이스에 맞게 변환
             const convertedSurveys = surveysData.map((survey: any) => ({
@@ -129,15 +206,7 @@ export default function SurveysPage() {
           responses_count: 22,
           created_at: '2025-01-15T00:00:00Z',
           updated_at: '2025-01-15T00:00:00Z',
-          expires_at: null,
-          targetClass: '6학년 1반',
-          duration: 7,
-          anonymous: true,
-          totalQuestions: 3,
-          responses: 22,
-          totalStudents: 28,
-          autoAnalysis: true,
-          createdAt: '2025-01-15'
+          expires_at: null
         },
         {
           id: '2',
@@ -150,15 +219,7 @@ export default function SurveysPage() {
           responses_count: 28,
           created_at: '2025-01-01T00:00:00Z',
           updated_at: '2025-01-01T00:00:00Z',
-          expires_at: null,
-          targetClass: '6학년 1반',
-          duration: 14,
-          anonymous: true,
-          totalQuestions: 4,
-          responses: 28,
-          totalStudents: 28,
-          autoAnalysis: true,
-          createdAt: '2025-01-01'
+          expires_at: null
         },
         {
           id: '3',
@@ -171,15 +232,7 @@ export default function SurveysPage() {
           responses_count: 0,
           created_at: '2025-01-20T00:00:00Z',
           updated_at: '2025-01-20T00:00:00Z',
-          expires_at: null,
-          targetClass: '6학년 1반',
-          duration: 7,
-          anonymous: true,
-          totalQuestions: 2,
-          responses: 0,
-          totalStudents: 28,
-          autoAnalysis: false,
-          createdAt: '2025-01-20'
+          expires_at: null
         }
       ];
 
@@ -284,12 +337,12 @@ export default function SurveysPage() {
       key: 'progress',
       width: 150,
       render: (_: any, record: Survey) => 
-        getResponseProgress(record.responses, record.totalStudents)
+        getResponseProgress(record.responses_count, 28) // Using 28 as default class size
     },
     {
       title: '생성일',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
+      dataIndex: 'created_at',
+      key: 'created_at',
       width: 120,
       render: (date: string) => new Date(date).toLocaleDateString('ko-KR')
     },
@@ -307,7 +360,7 @@ export default function SurveysPage() {
             />
           </Tooltip>
           
-          {record.status === 'active' && record.responses > 0 && (
+          {record.status === 'active' && record.responses_count > 0 && (
             <Tooltip title="AI 분석">
               <Button 
                 type="text" 
@@ -344,10 +397,10 @@ export default function SurveysPage() {
   const totalSurveys = surveys.length;
   const activeSurveys = surveys.filter(s => s.status === 'active').length;
   const completedSurveys = surveys.filter(s => s.status === 'completed').length;
-  const totalResponses = surveys.reduce((sum, s) => sum + s.responses, 0);
+  const totalResponses = surveys.reduce((sum, s) => sum + s.responses_count, 0);
 
   return (
-    <Layout user={{ name: '김선생', role: '교사' }}>
+    <Layout>
       <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

@@ -42,8 +42,16 @@ export default function DashboardPage() {
     recentActivity: []
   });
   const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+
+  // Client-side initialization
+  useEffect(() => {
+    setIsClient(true);
+    setAuthChecked(true);
+  }, []);
 
   // 인증 체크 및 대시보드 데이터 로딩
   useEffect(() => {

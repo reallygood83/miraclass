@@ -37,7 +37,7 @@ import {
   DisconnectOutlined
 } from '@ant-design/icons';
 import Layout from '@/components/common/Layout';
-import { supabase, db } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -148,7 +148,11 @@ export default function AnalyticsPage() {
     
     try {
       // 선택된 클래스 정보 가져오기
-      const { data: classesData } = await db.getClasses('550e8400-e29b-41d4-a716-446655440000');
+      const { data: classesData } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('teacher_id', '550e8400-e29b-41d4-a716-446655440000')
+        .order('created_at', { ascending: false });
       const selectedClassData = classesData?.find(c => c.name === selectedClass);
       
       if (selectedClassData) {
@@ -162,7 +166,11 @@ export default function AnalyticsPage() {
           .single();
 
         // 학생 데이터 조회
-        const { data: studentsData } = await db.getStudents(selectedClassData.id);
+        const { data: studentsData } = await supabase
+          .from('students')
+          .select('*')
+          .eq('class_id', selectedClassData.id)
+          .order('student_number', { ascending: true });
         
         // 관계 데이터 조회
         const { data: relationshipsData, error: relationshipsError } = await supabase
@@ -387,7 +395,7 @@ export default function AnalyticsPage() {
 
   if (loading && !analysisData) {
     return (
-      <Layout user={{ name: user.name, role: user.role }}>
+      <Layout>
         <div style={{ 
           display: 'flex', 
           flexDirection: 'column',
@@ -405,7 +413,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <Layout user={{ name: user.name, role: user.role }}>
+    <Layout>
       <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
         {/* 헤더 */}
         <div style={{ marginBottom: '24px' }}>

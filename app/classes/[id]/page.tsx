@@ -35,32 +35,39 @@ import {
   BarChartOutlined
 } from '@ant-design/icons';
 import Layout from '@/components/common/Layout';
-import { supabase, db, type User, type Class, type Student } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 
-interface User {
+interface LocalUser {
   id: string;
   name: string;
   email: string;
   role: 'teacher' | 'student';
+  school_name?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-interface Student {
+interface LocalStudent {
   id: string;
   name: string;
   student_number: number;
+  class_id: string;
   connections: number;
   risk_level: 'high' | 'medium' | 'low';
   last_survey: string;
   status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
 }
 
-interface Class {
+interface LocalClass {
   id: string;
   name: string;
   grade: number;
   class_number: number;
+  teacher_id: string;
   teacher_name: string;
   student_count: number;
   total_surveys: number;
@@ -68,12 +75,13 @@ interface Class {
   last_analysis: string;
   status: 'active' | 'inactive';
   created_at: string;
+  updated_at: string;
 }
 
 export default function ClassDetailPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [classData, setClassData] = useState<Class | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
+  const [user, setUser] = useState<LocalUser | null>(null);
+  const [classData, setClassData] = useState<LocalClass | null>(null);
+  const [students, setStudents] = useState<LocalStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -108,13 +116,17 @@ export default function ClassDetailPage() {
       if (!testError) {
         setIsSupabaseConnected(true);
         // 실제 사용자 조회
-        const { data: userData, error: userError } = await db.getUserByEmail('teacher@test.com');
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', 'teacher@test.com')
+          .single();
         
         if (userData && !userError) {
           setUser(userData);
         } else {
           // 더미 사용자
-          const dummyUser: User = {
+          const dummyUser: LocalUser = {
             id: '550e8400-e29b-41d4-a716-446655440000',
             name: '김선생',
             email: 'teacher@test.com',
@@ -131,7 +143,7 @@ export default function ClassDetailPage() {
         // Supabase 연결 실패 시 더미 모드
         console.warn('Supabase 연결 실패, 더미 데이터 모드:', testError);
         setIsSupabaseConnected(false);
-        const dummyUser: User = {
+        const dummyUser: LocalUser = {
           id: '1',
           name: '김선생',
           email: 'teacher@test.com',
@@ -157,7 +169,11 @@ export default function ClassDetailPage() {
     try {
       if (isSupabaseConnected) {
         // Supabase에서 학급 데이터 로드
-        const { data: classResult, error: classError } = await db.getClass(classId);
+        const { data: classResult, error: classError } = await supabase
+          .from('classes')
+          .select('*')
+          .eq('id', classId)
+          .single();
         
         if (classError) {
           console.error('Supabase 학급 데이터 로드 오류:', classError);
@@ -167,7 +183,11 @@ export default function ClassDetailPage() {
           setClassData(classResult);
           
           // 학생 데이터 로드
-          const { data: studentsResult, error: studentsError } = await db.getStudents(classId);
+          const { data: studentsResult, error: studentsError } = await supabase
+            .from('students')
+            .select('*')
+            .eq('class_id', classId)
+            .order('student_number', { ascending: true });
           
           if (studentsError) {
             console.error('실제 학생 데이터 로드 오류:', studentsError);
@@ -192,7 +212,7 @@ export default function ClassDetailPage() {
   };
 
   const loadDummyClassData = () => {
-    const dummyClass: Class = {
+    const dummyClass: LocalClass = {
       id: classId,
       name: '6학년 1반',
       grade: 6,
@@ -208,7 +228,7 @@ export default function ClassDetailPage() {
       updated_at: '2025-01-15T00:00:00Z'
     };
 
-    const dummyStudents: Student[] = [
+    const dummyStudents: LocalStudent[] = [
       {
         id: '1', name: '김민수', student_number: 1, class_id: classId,
         connections: 8, risk_level: 'low', last_survey: '1일 전', 
@@ -260,7 +280,11 @@ export default function ClassDetailPage() {
       };
       
       if (isSupabaseConnected) {
-        const { data, error } = await db.createStudent(newStudentData);
+        const { data, error } = await supabase
+          .from('students')
+          .insert([newStudentData])
+          .select()
+          .single();
         
         if (error) {
           console.error('Supabase 학생 추가 오류:', error);
@@ -269,13 +293,17 @@ export default function ClassDetailPage() {
         }
         
         // 학생 목록 새로고침
-        const { data: updatedStudents } = await db.getStudents(classData.id);
+        const { data: updatedStudents } = await supabase
+          .from('students')
+          .select('*')
+          .eq('class_id', classData.id)
+          .order('student_number', { ascending: true });
         setStudents(updatedStudents || []);
         
         message.success('학생이 추가되었습니다.');
       } else {
         // 더미 모드
-        const newStudent: Student = {
+        const newStudent: LocalStudent = {
           id: Date.now().toString(),
           ...newStudentData,
           last_survey: '아직 없음',
@@ -310,7 +338,7 @@ export default function ClassDetailPage() {
     {
       title: '학생명',
       key: 'student_info',
-      render: (_: any, record: Student) => (
+      render: (_: any, record: LocalStudent) => (
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <Avatar icon={<UserOutlined />} style={{ marginRight: '8px' }} />
           <div>
@@ -344,7 +372,7 @@ export default function ClassDetailPage() {
       dataIndex: 'last_survey',
       key: 'last_survey',
       render: (text: string) => (
-        <Text type={text === '아직 없음' ? 'secondary' : 'default'}>
+        <Text type={text === '아직 없음' ? 'secondary' : undefined}>
           {text}
         </Text>
       )
@@ -352,7 +380,7 @@ export default function ClassDetailPage() {
     {
       title: '작업',
       key: 'actions',
-      render: (_: any, record: Student) => (
+      render: (_: any, record: LocalStudent) => (
         <Space size="small">
           <Button 
             type="text" 
@@ -522,7 +550,7 @@ export default function ClassDetailPage() {
   ];
 
   return (
-    <Layout user={{ name: user.name, role: user.role }}>
+    <Layout>
       <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
         {/* 헤더 */}
         <div style={{ marginBottom: '24px' }}>

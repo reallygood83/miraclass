@@ -41,7 +41,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Layout from '@/components/common/Layout';
-import { supabase, db, MonitoringAlert } from '@/lib/supabase';
+import { supabase, MonitoringAlert } from '@/lib/supabase';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -92,6 +92,7 @@ export default function MonitoringPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [connectionLoading, setConnectionLoading] = useState(true);
+  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
   const router = useRouter();
 
   // 클라이언트 사이드임을 확인
@@ -157,12 +158,20 @@ export default function MonitoringPage() {
     
     try {
       // 선택된 클래스 정보 가져오기
-      const { data: classesData } = await db.getClasses('550e8400-e29b-41d4-a716-446655440000');
+      const { data: classesData } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('teacher_id', '550e8400-e29b-41d4-a716-446655440000')
+        .order('created_at', { ascending: false });
       const selectedClassData = classesData?.find(c => c.name === selectedClass);
       
       if (selectedClassData) {
         // 해당 클래스의 알림 데이터 로드
-        const { data: alertsData } = await db.getAlerts(selectedClassData.id);
+        const { data: alertsData } = await supabase
+          .from('monitoring_alerts')
+          .select('*')
+          .eq('class_id', selectedClassData.id)
+          .order('created_at', { ascending: false });
         
         if (alertsData) {
           // Supabase 데이터를 UI 형식에 맞게 변환
@@ -177,7 +186,11 @@ export default function MonitoringPage() {
         }
         
         // 학생 데이터 로드
-        const { data: studentsData } = await db.getStudents(selectedClassData.id);
+        const { data: studentsData } = await supabase
+          .from('students')
+          .select('*')
+          .eq('class_id', selectedClassData.id)
+          .order('name');
         
         if (studentsData) {
           const studentMonitoringData: StudentMonitoring[] = studentsData.map((student: any) => ({
@@ -207,6 +220,9 @@ export default function MonitoringPage() {
       
       setNetworkTrends(dummyTrends);
       
+      // 🔄 실시간 알림 구독 설정
+      setupRealtimeSubscription(selectedClassData.id);
+      
     } catch (error) {
       console.error('Supabase에서 모니터링 데이터 로드 실패:', error);
       message.error('모니터링 데이터를 불러오는데 실패했습니다.');
@@ -215,6 +231,95 @@ export default function MonitoringPage() {
       setLoading(false);
     }
   };
+
+  // 🔄 실시간 Supabase 구독 설정
+  const setupRealtimeSubscription = (classId: string) => {
+    // 기존 채널이 있다면 정리
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel);
+    }
+
+    console.log('📡 실시간 모니터링 알림 구독 설정 중...', classId);
+    
+    // 새로운 실시간 채널 생성
+    const channel = supabase
+      .channel('monitoring_alerts_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'monitoring_alerts',
+          filter: `class_id=eq.${classId}`
+        },
+        (payload) => {
+          console.log('🚨 새로운 알림 수신:', payload.new);
+          
+          // 새 알림을 기존 알림 목록에 추가
+          const newAlert: MonitoringAlert = {
+            ...payload.new as any,
+            studentName: '새로운 학생', // 실제로는 student_id로 조인해서 이름 가져와야 함
+            timestamp: payload.new.created_at,
+            isRead: false
+          };
+          
+          setAlerts(prevAlerts => [newAlert, ...prevAlerts]);
+          
+          // 사용자에게 알림 표시
+          message.success(`🚨 새로운 ${getSeverityText(newAlert.severity)} 알림: ${newAlert.title}`);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public', 
+          table: 'monitoring_alerts',
+          filter: `class_id=eq.${classId}`
+        },
+        (payload) => {
+          console.log('📝 알림 업데이트:', payload.new);
+          
+          // 기존 알림 업데이트
+          setAlerts(prevAlerts => 
+            prevAlerts.map(alert => 
+              alert.id === payload.new.id 
+                ? { ...alert, ...payload.new, timestamp: payload.new.created_at, isRead: payload.new.is_read }
+                : alert
+            )
+          );
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 실시간 구독 상태:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ 실시간 모니터링 알림 구독 완료!');
+          message.info('📡 실시간 모니터링이 활성화되었습니다');
+        }
+      });
+
+    setRealtimeChannel(channel);
+  };
+
+  // 심각도 텍스트 변환 헬퍼
+  const getSeverityText = (severity: 'high' | 'medium' | 'low') => {
+    switch (severity) {
+      case 'high': return '긴급';
+      case 'medium': return '중요';
+      case 'low': return '정보';
+      default: return '알림';
+    }
+  };
+
+  // 컴포넌트 언마운트 시 구독 정리
+  useEffect(() => {
+    return () => {
+      if (realtimeChannel) {
+        console.log('🧹 실시간 구독 채널 정리 중...');
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
+  }, [realtimeChannel]);
 
   const loadDummyMonitoringData = () => {
     setLoading(true);
@@ -367,7 +472,10 @@ export default function MonitoringPage() {
   const markAlertAsRead = async (alertId: string) => {
     if (isSupabaseConnected) {
       try {
-        await db.markAlertAsRead(alertId);
+        await supabase
+          .from('monitoring_alerts')
+          .update({ is_read: true, updated_at: new Date().toISOString() })
+          .eq('id', alertId);
       } catch (error) {
         console.error('알림 읽음 처리 실패:', error);
       }
@@ -416,7 +524,7 @@ export default function MonitoringPage() {
   }
 
   return (
-    <Layout user={{ name: user.name, role: user.role }}>
+    <Layout>
       <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* 헤더 */}
       <div style={{ marginBottom: '24px' }}>
@@ -611,7 +719,7 @@ export default function MonitoringPage() {
                             <Text style={{ fontSize: '12px' }}>{alert.message}</Text>
                             <br />
                             <Text type="secondary" style={{ fontSize: '11px' }}>
-                              {new Date(alert.timestamp).toLocaleString('ko-KR')}
+                              {alert.timestamp ? new Date(alert.timestamp).toLocaleString('ko-KR') : '시간 정보 없음'}
                             </Text>
                           </div>
                         }

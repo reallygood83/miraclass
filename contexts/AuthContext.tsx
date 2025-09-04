@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, User } from '@/lib/supabase';
+import { supabase, User } from '@/lib/supabase';
 import { message } from 'antd';
 
 interface AuthContextType {
@@ -24,10 +24,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkUser();
 
     // 인증 상태 변경 감지
-    const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         // 로그인됨
-        const { user: userProfile } = await auth.getCurrentUser();
+        const userProfile = await getCurrentUser();
         setUser(userProfile);
       } else {
         // 로그아웃됨
@@ -41,9 +41,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const getCurrentUser = async (): Promise<User | null> => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      // users 테이블에서 추가 정보 가져오기
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+        return null;
+      }
+
+      return userProfile || {
+        id: user.id,
+        email: user.email!,
+        name: user.user_metadata?.name || '',
+        role: user.user_metadata?.role || 'teacher',
+        created_at: user.created_at,
+        updated_at: user.updated_at || user.created_at
+      };
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
+  };
+
   const checkUser = async () => {
     try {
-      const { user: userProfile } = await auth.getCurrentUser();
+      const userProfile = await getCurrentUser();
       setUser(userProfile);
     } catch (error) {
       console.error('Error checking user:', error);
@@ -55,114 +86,131 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string): Promise<boolean> => {
     try {
-      setLoading(true);
-      const { data, error } = await auth.signIn(email, password);
-      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
       if (error) {
-        message.error(error.message || '로그인에 실패했습니다.');
+        message.error(error.message === 'Invalid login credentials' 
+          ? '이메일 또는 비밀번호가 올바르지 않습니다.' 
+          : error.message);
         return false;
       }
 
       if (data.user) {
-        const { user: userProfile } = await auth.getCurrentUser();
+        const userProfile = await getCurrentUser();
         setUser(userProfile);
         message.success('로그인되었습니다.');
         return true;
       }
 
       return false;
-    } catch (error: any) {
-      message.error(error.message || '로그인 중 오류가 발생했습니다.');
+    } catch (error) {
+      console.error('Sign in error:', error);
+      message.error('로그인 중 오류가 발생했습니다.');
       return false;
-    } finally {
-      setLoading(false);
     }
   };
 
-  const signUp = async (
-    email: string, 
-    password: string, 
-    name: string, 
-    role: 'teacher' | 'student' | 'admin' = 'teacher'
-  ): Promise<boolean> => {
+  const signUp = async (email: string, password: string, name: string, role: 'teacher' | 'student' | 'admin' = 'teacher'): Promise<boolean> => {
     try {
-      setLoading(true);
-      const { data, error } = await auth.signUp(email, password, name, role);
-      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role,
+          }
+        }
+      });
+
       if (error) {
-        message.error(error.message || '회원가입에 실패했습니다.');
+        message.error(error.message);
         return false;
       }
 
       if (data.user) {
-        message.success('회원가입이 완료되었습니다. 이메일을 확인해주세요.');
+        // users 테이블에도 정보 저장
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            id: data.user.id,
+            email: data.user.email!,
+            name,
+            role,
+          }]);
+
+        if (insertError) {
+          console.error('Failed to insert user data:', insertError);
+        }
+
+        message.success('회원가입이 완료되었습니다.');
         return true;
       }
 
       return false;
-    } catch (error: any) {
-      message.error(error.message || '회원가입 중 오류가 발생했습니다.');
+    } catch (error) {
+      console.error('Sign up error:', error);
+      message.error('회원가입 중 오류가 발생했습니다.');
       return false;
-    } finally {
-      setLoading(false);
     }
   };
 
   const signOut = async (): Promise<void> => {
     try {
-      setLoading(true);
-      const { error } = await auth.signOut();
-      
+      const { error } = await supabase.auth.signOut();
       if (error) {
-        message.error(error.message || '로그아웃에 실패했습니다.');
+        message.error('로그아웃 중 오류가 발생했습니다.');
       } else {
         setUser(null);
         message.success('로그아웃되었습니다.');
       }
-    } catch (error: any) {
-      message.error(error.message || '로그아웃 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Sign out error:', error);
+      message.error('로그아웃 중 오류가 발생했습니다.');
     }
   };
 
   const resetPassword = async (email: string): Promise<boolean> => {
     try {
-      const { error } = await auth.resetPassword(email);
-      
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`
+      });
+
       if (error) {
-        message.error(error.message || '비밀번호 재설정 요청에 실패했습니다.');
+        message.error(error.message);
         return false;
       }
 
-      message.success('비밀번호 재설정 이메일을 보냈습니다.');
+      message.success('비밀번호 재설정 링크가 이메일로 발송되었습니다.');
       return true;
-    } catch (error: any) {
-      message.error(error.message || '비밀번호 재설정 요청 중 오류가 발생했습니다.');
+    } catch (error) {
+      console.error('Reset password error:', error);
+      message.error('비밀번호 재설정 중 오류가 발생했습니다.');
       return false;
     }
   };
 
-  const value = {
-    user,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    resetPassword,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      resetPassword,
+    }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};

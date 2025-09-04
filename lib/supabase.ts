@@ -1,9 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Supabase configuration
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+// Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Connection check
+export const isSupabaseConnected = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL && 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 // Database Types
 export interface User {
@@ -79,10 +87,14 @@ export interface MonitoringAlert {
   is_read: boolean;
   created_at: string;
   updated_at: string;
+  // Additional UI properties
+  studentName?: string;
+  timestamp?: string;
+  isRead?: boolean;
 }
 
 // Auth helper functions
-export const auth = {
+const authHelpers = {
   // 회원가입
   async signUp(email: string, password: string, name: string, role: 'teacher' | 'student' | 'admin' = 'teacher') {
     const { data, error } = await supabase.auth.signUp({
@@ -176,7 +188,7 @@ export const auth = {
 };
 
 // Database helper functions
-export const db = {
+const dbHelpers = {
   // Users
   async getUser(id: string) {
     const { data, error } = await supabase
@@ -327,3 +339,10 @@ export const db = {
     return { data, error };
   }
 };
+
+// Export auth and db objects
+export const auth = authHelpers;
+export const db = dbHelpers;
+
+// Export default
+export default supabase;
