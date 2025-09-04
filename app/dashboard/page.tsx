@@ -44,18 +44,26 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('🏠 Dashboard component mounted');
     const token = authUtils.getToken();
+    console.log('🔍 Token check:', token ? 'Found' : 'Missing');
+    
     if (!token) {
+      console.log('❌ No token found, redirecting to login');
       router.push('/auth/login');
       return;
     }
 
     const userData = authUtils.getUserFromToken(token);
+    console.log('👤 User data from token:', userData);
+    
     if (!userData) {
+      console.log('❌ Invalid token, redirecting to login');
       router.push('/auth/login');
       return;
     }
 
+    console.log('✅ Dashboard authenticated successfully for user:', userData.name);
     setUser(userData);
     fetchDashboardData();
   }, [router]);

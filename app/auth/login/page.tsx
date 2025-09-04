@@ -20,10 +20,12 @@ export default function LoginPage() {
   const router = useRouter();
 
   const onFinish = async (values: LoginForm) => {
+    console.log('🔄 Login form submitted:', values);
     setLoading(true);
     setError('');
 
     try {
+      console.log('📤 Making API request to /api/auth/login');
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -32,21 +34,37 @@ export default function LoginPage() {
         body: JSON.stringify(values),
       });
 
+      console.log('📥 API Response status:', response.status, response.statusText);
       const data = await response.json();
+      console.log('📄 API Response data:', data);
 
       if (response.ok) {
+        console.log('✅ Login successful, token received:', data.token ? 'Yes' : 'No');
+        
         // 토큰 저장
         authUtils.setToken(data.token);
+        console.log('💾 Token stored in localStorage');
         
-        // 사용자 역할에 따라 리다이렉트
+        // 토큰 확인
+        const storedToken = authUtils.getToken();
+        console.log('🔍 Token verification - stored:', storedToken ? 'Yes' : 'No');
+        
+        // 사용자 정보 확인
+        const userInfo = authUtils.getUserFromToken();
+        console.log('👤 User info from token:', userInfo);
+        
+        console.log('🔄 Redirecting to dashboard...');
         router.push('/dashboard');
       } else {
+        console.error('❌ Login failed:', data.error);
         setError(data.error || '로그인에 실패했습니다.');
       }
     } catch (error) {
+      console.error('💥 Network/Parse error:', error);
       setError('서버 연결에 실패했습니다.');
     } finally {
       setLoading(false);
+      console.log('🏁 Login process completed');
     }
   };
 

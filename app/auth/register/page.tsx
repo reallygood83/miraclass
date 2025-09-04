@@ -28,10 +28,12 @@ export default function RegisterPage() {
   const [selectedRole, setSelectedRole] = useState<'teacher' | 'student'>('student');
 
   const onFinish = async (values: RegisterForm) => {
+    console.log('🔄 Registration form submitted:', values);
     setLoading(true);
     setError('');
 
     try {
+      console.log('📤 Making API request to /api/auth/register');
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
@@ -40,18 +42,24 @@ export default function RegisterPage() {
         body: JSON.stringify(values),
       });
 
+      console.log('📥 API Response status:', response.status, response.statusText);
       const data = await response.json();
+      console.log('📄 API Response data:', data);
 
       if (response.ok) {
+        console.log('✅ Registration successful, redirecting to login...');
         // 회원가입 성공 시 로그인 페이지로 이동
         router.push('/auth/login?message=회원가입이 완료되었습니다. 로그인해주세요.');
       } else {
+        console.error('❌ Registration failed:', data.error);
         setError(data.error || '회원가입에 실패했습니다.');
       }
     } catch (error) {
+      console.error('💥 Network/Parse error:', error);
       setError('서버 연결에 실패했습니다.');
     } finally {
       setLoading(false);
+      console.log('🏁 Registration process completed');
     }
   };
 
