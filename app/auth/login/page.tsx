@@ -46,7 +46,7 @@ export default function LoginPage() {
         authUtils.setToken(data.token);
         
         // 쿠키에도 토큰 저장 (middleware에서 사용)
-        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=strict`;
+        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
         
         console.log('💾 Token stored in localStorage and cookies');
         

@@ -14,7 +14,7 @@ export const authUtils = {
     if (typeof window !== 'undefined') {
       localStorage.setItem('token', token);
       // 쿠키에도 저장 (middleware에서 사용)
-      document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=strict`;
+      document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
     }
   },
 
