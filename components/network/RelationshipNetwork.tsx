@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react';
-import { Card, Select, Button, Space, Statistic, Row, Col, message, Spin } from 'antd';
+import { Card, Select, Button, Space, Statistic, Row, Col, message, Spin, Modal, Descriptions, Badge, Tag } from 'antd';
 import { ReloadOutlined, FullscreenOutlined, BarChartOutlined, TeamOutlined } from '@ant-design/icons';
 import { 
   Student, 
@@ -43,6 +43,8 @@ const RelationshipNetwork: React.FC<RelationshipNetworkProps> = ({
   const [edges, setEdges] = useState<NetworkVisualizationEdge[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState<Student | null>(null);
+  const [showStudentModal, setShowStudentModal] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -126,6 +128,44 @@ const RelationshipNetwork: React.FC<RelationshipNetworkProps> = ({
   const resetView = () => {
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
+  };
+
+  // 학생 상세 정보 표시
+  const showStudentDetails = (nodeId: string) => {
+    if (!networkData) return;
+    
+    const student = networkData.students.find(s => s.id === nodeId);
+    if (student) {
+      setSelectedStudentDetail(student);
+      setShowStudentModal(true);
+    }
+  };
+
+  // 학생의 관계 정보 계산
+  const getStudentRelationshipInfo = (studentId: string) => {
+    if (!networkData) return null;
+
+    const analysis = networkData.networkAnalysis.find(a => a.studentId === studentId);
+    const outgoingRelationships = networkData.relationships.filter(r => r.fromStudentId === studentId);
+    const incomingRelationships = networkData.relationships.filter(r => r.toStudentId === studentId);
+    
+    const friendRelations = outgoingRelationships.filter(r => r.relationshipType === 'friend');
+    const collaborationRelations = outgoingRelationships.filter(r => r.relationshipType === 'collaboration');
+    const trustRelations = outgoingRelationships.filter(r => r.relationshipType === 'trust');
+    
+    const mutualFriends = outgoingRelationships.filter(out => 
+      incomingRelationships.some(inc => inc.fromStudentId === out.toStudentId && out.relationshipType === 'friend')
+    );
+
+    return {
+      analysis,
+      outgoingRelationships,
+      incomingRelationships,
+      friendRelations,
+      collaborationRelations, 
+      trustRelations,
+      mutualFriends
+    };
   };
 
   // 더미 데이터 생성 (실제 데이터가 없을 때 사용)
@@ -577,7 +617,9 @@ const RelationshipNetwork: React.FC<RelationshipNetworkProps> = ({
       // 클릭/탭 이벤트
       group.addEventListener('click', (e) => {
         e.preventDefault();
-        // 노드 정보를 콘솔에 출력하거나 상태에 저장
+        e.stopPropagation();
+        // 학생 상세 정보 모달 표시
+        showStudentDetails(node.id);
         console.log(`선택된 학생: ${node.name}`, {
           중심성: `${(node.centralityScore * 100).toFixed(1)}%`,
           연결수: node.connections,
@@ -991,6 +1033,178 @@ const RelationshipNetwork: React.FC<RelationshipNetworkProps> = ({
           classSummary={networkData.classSummary}
         />
       )}
+
+      {/* 학생 상세 정보 모달 */}
+      <Modal
+        title={
+          selectedStudentDetail ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div 
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  backgroundColor: selectedStudentDetail.gender === 'M' ? '#4096ff' : '#f759ab'
+                }}
+              />
+              <span>{selectedStudentDetail.name} ({selectedStudentDetail.number}번)</span>
+              <Badge 
+                text={selectedStudentDetail.gender === 'M' ? '남학생' : '여학생'}
+                color={selectedStudentDetail.gender === 'M' ? 'blue' : 'pink'}
+              />
+            </div>
+          ) : '학생 정보'
+        }
+        open={showStudentModal}
+        onCancel={() => {
+          setShowStudentModal(false);
+          setSelectedStudentDetail(null);
+        }}
+        footer={null}
+        width={windowWidth < 768 ? '95%' : 600}
+        centered
+      >
+        {selectedStudentDetail && (() => {
+          const relationshipInfo = getStudentRelationshipInfo(selectedStudentDetail.id);
+          const isIsolated = networkData?.classSummary.isolatedStudents.includes(selectedStudentDetail.id);
+          const isPopular = networkData?.classSummary.popularStudents.includes(selectedStudentDetail.id);
+          const isBridge = networkData?.classSummary.bridgeStudents.includes(selectedStudentDetail.id);
+
+          return (
+            <div>
+              {/* 학생 특성 태그 */}
+              <div style={{ marginBottom: '16px' }}>
+                <Space wrap>
+                  {isPopular && <Tag color="green" style={{ fontSize: '12px' }}>🌟 인기 학생</Tag>}
+                  {isBridge && <Tag color="orange" style={{ fontSize: '12px' }}>🌉 브릿지 학생</Tag>}
+                  {isIsolated && <Tag color="red" style={{ fontSize: '12px' }}>⚠️ 고립 위험</Tag>}
+                  {!isPopular && !isBridge && !isIsolated && (
+                    <Tag color="default" style={{ fontSize: '12px' }}>👥 일반 학생</Tag>
+                  )}
+                </Space>
+              </div>
+
+              {/* 중심성 지표 */}
+              <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+                <Col span={12}>
+                  <Statistic
+                    title="중심성 점수"
+                    value={(relationshipInfo?.analysis?.degreeCentrality || 0) * 100}
+                    precision={1}
+                    suffix="%"
+                    valueStyle={{ color: '#1890ff' }}
+                  />
+                </Col>
+                <Col span={12}>
+                  <Statistic
+                    title="전체 연결수"
+                    value={relationshipInfo?.analysis?.totalConnections || 0}
+                    suffix="개"
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                </Col>
+              </Row>
+
+              {/* 상세 관계 정보 */}
+              <Descriptions 
+                title="관계 분석 상세" 
+                bordered 
+                size="small" 
+                column={windowWidth < 768 ? 1 : 2}
+                style={{ marginBottom: '16px' }}
+              >
+                <Descriptions.Item label="성별">
+                  {selectedStudentDetail.gender === 'M' ? '남학생' : '여학생'}
+                </Descriptions.Item>
+                <Descriptions.Item label="번호">
+                  {selectedStudentDetail.number}번
+                </Descriptions.Item>
+                <Descriptions.Item label="친구 관계">
+                  {relationshipInfo?.friendRelations.length || 0}명
+                </Descriptions.Item>
+                <Descriptions.Item label="협력 관계">
+                  {relationshipInfo?.collaborationRelations.length || 0}명
+                </Descriptions.Item>
+                <Descriptions.Item label="신뢰 관계">
+                  {relationshipInfo?.trustRelations.length || 0}명
+                </Descriptions.Item>
+                <Descriptions.Item label="상호 친구">
+                  {relationshipInfo?.mutualFriends.length || 0}명
+                </Descriptions.Item>
+                <Descriptions.Item label="받은 선택">
+                  {relationshipInfo?.incomingRelationships.length || 0}회
+                </Descriptions.Item>
+                <Descriptions.Item label="고립 위험도">
+                  <Tag color={
+                    relationshipInfo?.analysis?.isolationRisk === 'high' ? 'red' :
+                    relationshipInfo?.analysis?.isolationRisk === 'medium' ? 'orange' : 'green'
+                  }>
+                    {relationshipInfo?.analysis?.isolationRisk === 'high' ? '높음' :
+                     relationshipInfo?.analysis?.isolationRisk === 'medium' ? '보통' : '낮음'}
+                  </Tag>
+                </Descriptions.Item>
+              </Descriptions>
+
+              {/* 연결된 친구들 목록 */}
+              {relationshipInfo && relationshipInfo.outgoingRelationships.length > 0 && (
+                <div>
+                  <h4 style={{ marginBottom: '12px' }}>연결된 친구들</h4>
+                  <Space wrap>
+                    {relationshipInfo.outgoingRelationships.map((rel) => {
+                      const friendStudent = networkData?.students.find(s => s.id === rel.toStudentId);
+                      if (!friendStudent) return null;
+                      
+                      return (
+                        <Tag 
+                          key={rel.id}
+                          color={
+                            rel.relationshipType === 'friend' ? 'green' :
+                            rel.relationshipType === 'collaboration' ? 'blue' : 'purple'
+                          }
+                          style={{ 
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            padding: '4px 8px'
+                          }}
+                          onClick={() => showStudentDetails(friendStudent.id)}
+                        >
+                          {friendStudent.name} ({friendStudent.number}번)
+                          {rel.relationshipType === 'friend' && '👫'}
+                          {rel.relationshipType === 'collaboration' && '🤝'}
+                          {rel.relationshipType === 'trust' && '🤗'}
+                          {rel.isReciprocal && ' ↔️'}
+                        </Tag>
+                      );
+                    })}
+                  </Space>
+                </div>
+              )}
+
+              {/* AI 분석 인사이트 */}
+              {relationshipInfo?.analysis && (
+                <div style={{ marginTop: '16px', padding: '12px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '6px' }}>
+                  <h4 style={{ color: '#52c41a', marginBottom: '8px' }}>💡 AI 분석 인사이트</h4>
+                  <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
+                    {isPopular && (
+                      <p>이 학생은 반에서 인기가 많고 다른 학생들과의 관계가 활발합니다. 리더십 역할을 맡기거나 그룹 활동의 중심 역할을 부여해보세요.</p>
+                    )}
+                    {isBridge && (
+                      <p>이 학생은 다른 그룹들을 연결하는 브릿지 역할을 합니다. 반 전체의 화합을 이끄는 역할을 맡기면 좋겠습니다.</p>
+                    )}
+                    {isIsolated && (
+                      <p>이 학생은 고립 위험이 있습니다. 관심을 가지고 다른 학생들과 연결될 수 있도록 소그룹 활동에 참여시켜 보세요.</p>
+                    )}
+                    <p>
+                      사교성 점수: <strong>{((relationshipInfo.analysis.sociabilityScore || 0) * 100).toFixed(1)}%</strong>,
+                      인기도 점수: <strong>{((relationshipInfo.analysis.popularityScore || 0) * 100).toFixed(1)}%</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
   );
 };
