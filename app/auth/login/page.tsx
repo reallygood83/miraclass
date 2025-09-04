@@ -42,9 +42,13 @@ export default function LoginPage() {
       if (response.ok) {
         console.log('✅ Login successful, token received:', data.token ? 'Yes' : 'No');
         
-        // 토큰 저장
+        // 토큰 저장 (localStorage와 쿠키에 모두 저장)
         authUtils.setToken(data.token);
-        console.log('💾 Token stored in localStorage');
+        
+        // 쿠키에도 토큰 저장 (middleware에서 사용)
+        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=strict`;
+        
+        console.log('💾 Token stored in localStorage and cookies');
         
         // 토큰 확인
         const storedToken = authUtils.getToken();

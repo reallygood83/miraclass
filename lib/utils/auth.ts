@@ -13,6 +13,8 @@ export const authUtils = {
   setToken: (token: string) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('token', token);
+      // 쿠키에도 저장 (middleware에서 사용)
+      document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; secure; samesite=strict`;
     }
   },
 
@@ -20,6 +22,8 @@ export const authUtils = {
   removeToken: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
+      // 쿠키도 삭제
+      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     }
   },
 

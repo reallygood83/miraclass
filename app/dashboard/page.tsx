@@ -78,6 +78,8 @@ export default function DashboardPage() {
         
         if (!token) {
           console.log('❌ No token found, redirecting to login');
+          // 쿠키도 정리
+          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
           setAuthChecked(true);
           window.location.replace('/auth/login');
           return;
@@ -89,7 +91,7 @@ export default function DashboardPage() {
         
         if (!userData) {
           console.log('❌ Invalid token, clearing and redirecting');
-          authUtils.removeToken();
+          authUtils.removeToken(); // localStorage와 쿠키 모두 삭제
           setAuthChecked(true);
           window.location.replace('/auth/login');
           return;
@@ -98,7 +100,7 @@ export default function DashboardPage() {
         // 토큰 만료 체크
         if (!authUtils.isLoggedIn()) {
           console.log('❌ Token expired, clearing and redirecting');
-          authUtils.removeToken();
+          authUtils.removeToken(); // localStorage와 쿠키 모두 삭제
           setAuthChecked(true);
           window.location.replace('/auth/login');
           return;
@@ -112,7 +114,7 @@ export default function DashboardPage() {
         
       } catch (error) {
         console.error('💥 Authentication error:', error);
-        authUtils.removeToken();
+        authUtils.removeToken(); // localStorage와 쿠키 모두 삭제
         setAuthChecked(true);
         window.location.replace('/auth/login');
       }
