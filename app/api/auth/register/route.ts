@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -30,8 +30,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // supabaseAdmin 확인
+    if (!supabaseAdmin) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+    }
+
     // 이메일 중복 확인
-    const { data: existingUsers, error: checkError } = await supabase
+    const { data: existingUsers, error: checkError } = await supabaseAdmin
       .from('users')
       .select('id')
       .eq('email', email.toLowerCase())
@@ -51,7 +56,7 @@ export async function POST(request: NextRequest) {
     // 학교 찾기 또는 생성 (교사의 경우)
     let school_id = null;
     if (role === 'teacher' && school_name) {
-      const { data: schools, error: schoolError } = await supabase
+      const { data: schools, error: schoolError } = await supabaseAdmin
         .from('schools')
         .select('id')
         .eq('name', school_name)
@@ -63,7 +68,7 @@ export async function POST(request: NextRequest) {
         school_id = schools[0].id;
       } else {
         // 새 학교 생성
-        const { data: newSchool, error: newSchoolError } = await supabase
+        const { data: newSchool, error: newSchoolError } = await supabaseAdmin
           .from('schools')
           .insert({
             name: school_name,
@@ -95,7 +100,7 @@ export async function POST(request: NextRequest) {
     if (grade) userData.grade = parseInt(grade);
     if (class_number) userData.class_number = parseInt(class_number);
 
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .insert(userData)
       .select('id, email, name, role, school_id, grade, class_number, created_at')
@@ -128,7 +133,7 @@ export async function POST(request: NextRequest) {
     );
 
     // 가입 로그 기록
-    await supabase
+    await supabaseAdmin
       .from('user_activity_logs')
       .insert({
         user_id: user.id,
